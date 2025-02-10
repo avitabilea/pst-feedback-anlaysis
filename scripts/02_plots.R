@@ -16,6 +16,12 @@ conflict_prefer(name = "filter", winner = "dplyr")
 font_add(family = "LMRoman", regular = here("lmroman10-regular.otf"))
 showtext_auto()
 
+# Set output filepath - YOU'LL NEED TO UPDATE THIS 
+output_path <- "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
+
+#Load data
+analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
+
 #Plot length----
 # Feedback sentence count histogram
 ggplot(analysis_data, aes(x=n_sentences_feed)) +
@@ -27,7 +33,7 @@ ggplot(analysis_data, aes(x=n_sentences_feed)) +
   scale_y_continuous(expand = c(0,0)) +
   theme(text=element_text(family="LMRoman", color = "black", size = 24), plot.caption = element_text(hjust = 0), axis.text = element_text(color = "black", size = 24)) +
   geom_vline(xintercept = median(analysis_data$n_sentences_feed), linetype = "dashed", color = "black")
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Sentences Per Feedback Hist.pdf", width = 6, height = 4)
+ggsave(file.path(output_path, "Sentences Per Feedback Hist.pdf", width = 6, height = 4)
 
 # Reflection sentence count histogram
 ggplot(analysis_data, aes(x=n_sentences_ref)) +
@@ -39,24 +45,21 @@ ggplot(analysis_data, aes(x=n_sentences_ref)) +
   scale_y_continuous(expand = c(0,0)) +
   theme(text=element_text(family="LMRoman", color = "black", size = 24), plot.caption = element_text(hjust = 0), axis.text = element_text(color = "black", size = 24)) +
   geom_vline(xintercept = median(analysis_data$n_sentences_ref, na.rm=T), linetype = "dashed", color = "black")
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Sentences Per Reflection Hist.pdf", width = 6, height = 4)
+ggsave(file.path(output_path, "Sentences Per Reflection Hist.pdf", width = 6, height = 4)
 
 #Plot feedback descriptions----
 plot_data <- analysis_data %>%
-  mutate(feedback_score = rowMeans(across(c("specific_examples", "next_steps", "strengths_mentioned",
-                                            "areas_for_growth", "specificity", "actionability",
-                                            "balance", "growth_oriented", "standards_aligned")),
-                                   na.rm = TRUE))
+  mutate(feedback_score = rowMeans(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed")), na.rm = TRUE))
 
 # Calculate overall means
 overall_means <- plot_data %>%
-  summarize(across(c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"),
+  summarize(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed"),
                    ~mean(.x, na.rm = TRUE), .names = "overall_{.col}"))
 
 # Calculate PST-level means (PSTs with at least one occurrence)
 pst_means <- plot_data %>%
   group_by(pst_id) %>%
-  summarize(across(c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"),
+  summarize(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed"),
                    ~as.numeric(any(.x == 1, na.rm = TRUE)))) %>%
   summarize(across(-pst_id, ~mean(.x, na.rm = TRUE), .names = "pst_{.col}"))
 
@@ -77,10 +80,10 @@ plot_data_combined <- bind_rows(
     Category = str_remove(Category, "^(overall_|pst_)"),
     Category = str_replace_all(Category, "_", " ") %>% str_to_title()
   ) %>%
-  mutate(Category = case_when(Category=="Strengths Mentioned" ~ "PST Strengths",
-                              Category=="Specific Examples" ~ "Specific Examples",
-                              Category=="Areas For Growth" ~ "Area for Improvement",
-                              Category=="Next Steps" ~ "Next Steps"))
+  mutate(Category = case_when(Category=="Strengths Mentioned Feed" ~ "PST Strengths",
+                              Category=="Specific Examples Feed" ~ "Specific Examples",
+                              Category=="Areas For Growth Feed" ~ "Area for Improvement",
+                              Category=="Next Steps Feed" ~ "Next Steps"))
 
 # Create bar plot
 ggplot(plot_data_combined, aes(x = reorder(Category, Mean), y = Mean, fill = Type)) +
@@ -99,17 +102,17 @@ ggplot(plot_data_combined, aes(x = reorder(Category, Mean), y = Mean, fill = Typ
     legend.position = "bottom"
   )
 rm(plot_data_combined, overall_means, pst_means)
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Feedback Bar Chart.pdf", width = 6, height = 4)
+ggsave(file.path(output_path, "Feedback Bar Chart.pdf", width = 6, height = 4)
 
 #Plot area for improvement----
 # Data preparation for supervisor feedback
 plot_data_1 <- analysis_data %>% 
-  group_by(area_for_improvement) %>%
+  group_by(area_for_improvement_feed) %>%
   summarize(n=n()) %>%
   arrange(-n) %>%
   ungroup %>%
   mutate(pct=n/sum(n)) %>%
-  rename(skill=area_for_improvement) %>%
+  rename(skill=area_for_improvement_feed) %>%
   mutate(type = "Supervisor Feedback")
 
 # Data preparation for PST reflection
@@ -150,7 +153,7 @@ plot_data %>%
   ggplot(aes(x = skill, y = pct, fill = type)) +
   geom_bar(stat = "identity", position = "dodge") +
   geom_errorbar(aes(ymin = ci95_minus, ymax = ci95_plus), 
-                colour = "black", alpha = 1, size = 0.5, 
+                colour = "black", alpha = 1, linewidth = 0.5, 
                 width = 0.25, position = position_dodge(0.9)) +
   theme_minimal() +
   coord_flip() +
@@ -168,27 +171,27 @@ plot_data %>%
         strip.text = element_text(face = "bold", size = 24)) +
   scale_fill_manual(values = c("Supervisor Feedback" = "#FF8C42", 
                                "PST Reflection" = "#1F4E79"))
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Bar Chart Area for Improvement.pdf", width = 11, height = 7.5)
+ggsave(file.path(output_path, "Bar Chart Area for Improvement.pdf", width = 11, height = 7.5)
 
 # What do PSTs mention when supervisors suggest other, nothing, or multiple areas for improvement?----
 # Calculate share_same
 share_same <- analysis_data %>%
-  group_by(area_for_improvement, area_for_improvement_ref) %>%
+  group_by(area_for_improvement_feed, area_for_improvement_ref) %>%
   summarize(n = n(), .groups = "drop") %>%
-  mutate(same = ifelse(area_for_improvement == area_for_improvement_ref, 1, 0)) %>%
-  group_by(area_for_improvement, same) %>%
+  mutate(same = ifelse(area_for_improvement_feed == area_for_improvement_ref, 1, 0)) %>%
+  group_by(area_for_improvement_feed, same) %>%
   summarize(n = sum(n), .groups = "drop") %>%
-  group_by(area_for_improvement) %>%
+  group_by(area_for_improvement_feed) %>%
   mutate(N = sum(n), share = n / N) %>%
   filter(same == 1) %>%
-  select(area_for_improvement_ref=area_for_improvement, n, N, share) %>%
+  select(area_for_improvement_ref=area_for_improvement_feed, n, N, share) %>%
   mutate(group = "Same Area")
 
 # Calculate share_none
 share_none <- analysis_data %>%
-  group_by(area_for_improvement, area_for_improvement_ref) %>%
+  group_by(area_for_improvement_feed, area_for_improvement_ref) %>%
   summarize(n = n(), .groups = "drop") %>%
-  filter(area_for_improvement == "None") %>%
+  filter(area_for_improvement_feed == "None") %>%
   mutate(N = sum(n), share = n / N) %>%
   select(area_for_improvement_ref, n, N, share) %>%
   mutate(group = "No Area")
@@ -196,7 +199,7 @@ share_none <- analysis_data %>%
 # Define a function to calculate the share for each area_for_improvement_ref (Other)
 calculate_shares <- function(ref_area) {
   analysis_data %>%
-    filter(area_for_improvement != "None", area_for_improvement != ref_area) %>%
+    filter(area_for_improvement_feed != "None", area_for_improvement_feed != ref_area) %>%
     group_by(area_for_improvement_ref) %>%
     summarize(n = n(), .groups = "drop") %>%
     mutate(N = sum(n), share = n / N) %>%
@@ -207,7 +210,7 @@ calculate_shares <- function(ref_area) {
 
 # Get all unique values of area_for_improvement_ref
 unique_areas <- analysis_data %>%
-  filter(area_for_improvement != "None") %>%
+  filter(area_for_improvement_feed != "None") %>%
   pull(area_for_improvement_ref) %>%
   unique()
 
@@ -261,16 +264,15 @@ final_result %>%
     "No Area" = "grey",
     "Same Area" = "#FF8C42"
   ))
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/AFI_Ref_when_no_AFI_Feedback.pdf", width = 11, height = 7.5)
+ggsave(file.path(output_path, "AFI_Ref_when_no_AFI_Feedback.pdf", width = 11, height = 7.5)
 
 #Share of times supervisors provide no feedback----
 analysis_data %>%
   group_by(supervisor_id) %>%
   summarize(
-    no_area_for_improvement = sum(afi_9),
+    no_area_for_improvement = sum(afi_10_feed),
     n = n()
   ) %>%
-  # filter(n>=10) %>%
   ungroup() %>%
   mutate(
     sup_share_no_area = no_area_for_improvement / n,
@@ -299,48 +301,13 @@ analysis_data %>%
     strip.text = element_text(face = "bold", size = 24),
     axis.text.x = element_blank()
   )
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Supervisor pct no area for improvement.pdf", width = 11, height = 7.5)
-
-#What does supervisor feedback include if no area for improvement? 
-plot_data <- analysis_data %>% 
-  mutate(no_www_or_afi = factor(no_www_or_afi, levels = c("none", "other", "retelling", "praise", "feedback"), labels = c( "Other", "Other", "Retelling of Lesson", "PST Praise", "Has Area for Improvement"))) %>%
-  group_by(no_www_or_afi) %>%
-  summarize(n=n()) %>%
-  arrange(-n) %>%
-  ungroup %>%
-  mutate(pct=n/sum(n)) %>%
-  rename(skill=no_www_or_afi)
-
-# Create the plot
-plot_data %>%
-  # Reorder based on total percentage across both types
-  group_by(skill) %>%
-  mutate(total_pct = sum(pct)) %>%
-  ungroup() %>%
-  # mutate(skill = fct_reorder(skill, total_pct)) %>%
-  ggplot(aes(x = skill, y = pct)) +
-  geom_bar(stat = "identity", position = "dodge", fill = "#FF8C42") +
-  theme_minimal() +
-  coord_flip() +
-  labs(y = "Percent of Feedback", 
-       x = "Broad Description of Text") +
-  scale_y_continuous(expand = c(0, 0), 
-                     breaks = c(0.1, 0.2, 0.3, 0.4, 0.5), 
-                     limits = c(0.0, 0.58),
-                     labels = scales::percent_format()) +
-  theme(text = element_text(family = "LMRoman", color = "black", size = 24),
-        plot.caption = element_text(hjust = 0),
-        axis.text = element_text(color = "black", size = 24),
-        legend.position = "none",
-        legend.title = element_blank(),
-        strip.text = element_text(face = "bold", size = 24))
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Bar Chart Broad Description of Text.pdf", width = 11, height = 7.5)
+ggsave(file.path(output_path, "Supervisor pct no area for improvement.pdf", width = 11, height = 7.5)
 
 #How do outcomes look for the most and least strict supervisors----
 analysis_data %>%
   group_by(supervisor_id, sup_blup_std) %>%
   summarize(
-    no_area_for_improvement = sum(afi_9),
+    no_area_for_improvement = sum(afi_10_feed),
     n_obs_sup = n(),
     prop_no_area_for_improvement = no_area_for_improvement / n_obs_sup,
     .groups = "drop"  # This removes the grouping after summarizing
@@ -376,94 +343,4 @@ analysis_data %>%
     legend.title = element_text(size = 24),
     strip.text = element_text(face = "bold", size = 24)
   )
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Supervisor BLUPS vs AFI.pdf", width = 11, height = 7.5)
-
-test <- analysis_data %>%
-  group_by(supervisor_id, sup_blup_std) %>%
-  summarize(
-    no_area_for_improvement = sum(afi_9),
-    n_obs_sup = n(),
-    prop_no_area_for_improvement = no_area_for_improvement / n_obs_sup,
-    .groups = "drop"  # This removes the grouping after summarizing
-  )
-feols(prop_no_area_for_improvement ~ sup_blup_std, test, vcov = "hetero", weights = ~n_obs_sup)
-
-#Plot Observations with Feedback Containing an Area for Improvement----
-analysis_data %>%
-  mutate(area_for_improvement = fct_recode(area_for_improvement, "Assessment & Feedback" = "Assessment and Feedback")) %>%
-  mutate(N = n_distinct(pst_id)) %>%
-  group_by(pst_id, N) %>%
-  count(area_for_improvement, name = "no_rows", .drop = F) %>%
-  group_by(area_for_improvement, no_rows, N) %>%
-  summarize(count = sum(n()), .groups = "drop") %>%
-  mutate(pct = count / N) %>%
-  group_by(area_for_improvement) %>%
-  mutate(non_zero_pct_sum = sum(pct[no_rows != 0]),
-         label_position = mean(no_rows[no_rows != 0])) %>% # Center the label over the non-zero bars
-  ggplot(aes(x = no_rows, y = pct,
-             fill = factor(no_rows == 0),
-             color = factor(no_rows == 0))) +
-  geom_bar(stat = "identity", position = "dodge") +
-  # Add an annotation with the sum centered over the non-zero bars, styled in blue
-  geom_text(data = . %>% distinct(area_for_improvement, non_zero_pct_sum, label_position),
-            aes(x = 2, y = 0.35, label = scales::percent(non_zero_pct_sum, accuracy = 0.1)),
-            inherit.aes = FALSE,
-            size = 10,
-            family = "LMRoman",
-            hjust = 0.5,
-            color = "#1F4E79") +  # Blue text to match the blue bars
-  scale_fill_manual(values = c("FALSE" = "#1F4E79", "TRUE" = "#FF8C42")) +
-  scale_color_manual(values = c("FALSE" = "#1F4E79", "TRUE" = "#FF8C42")) +
-  facet_wrap(~area_for_improvement, nrow = 2, strip.position = "bottom", axis.labels = "all") +
-  theme_minimal() +
-  labs(y = "Percent of PSTs", 
-       x = "Number of Observations with Feedback Containing an Area for Improvement") +
-  scale_y_continuous(expand = c(0, 0), 
-                     breaks = seq(0, 1, by = 0.25),
-                     limits = c(0.0, 1.15),
-                     labels = scales::percent_format()) +
-  theme(text = element_text(family = "LMRoman", color = "black", size = 28),
-        plot.caption = element_text(hjust = 0),
-        axis.text = element_text(color = "black", size = 28),
-        legend.position = "none",
-        strip.text = element_text(face = "bold", size = 28),
-        panel.grid.minor = element_blank())
-ggsave("C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Obs Containing Each AFI.pdf", width = 25, height = 10)
-
-#Plot Observations with Reflections Containing an Area for Improvement----
-analysis_data %>%
-  mutate(area_for_improvement_ref = fct_recode(area_for_improvement_ref,"Assessment & Feedback" = "Assessment and Feedback")) %>%
-  mutate(N=n_distinct(pst_id)) %>%
-  group_by(pst_id, N) %>%
-  count(area_for_improvement_ref, name = "no_rows", .drop = F) %>%
-  group_by(area_for_improvement_ref, no_rows, N) %>%
-  summarize(count = sum(n()), .groups = "drop") %>%
-  mutate(pct = count/N) %>%
-  ggplot(aes(x=no_rows, y=pct, 
-             fill = factor(no_rows == 0),
-             color = factor(no_rows == 0))) +
-  geom_bar(stat = "identity", position = "dodge") +
-  # Add label for orange bars
-  geom_text(aes(label = ifelse(no_rows == 0, 
-                               scales::percent(pct, accuracy = 0.1), 
-                               "")),
-            vjust = -0.5,
-            size = 10,
-            family = "LMRoman") +  
-  scale_fill_manual(values = c("FALSE" = "#1F4E79", "TRUE" = "#FF8C42")) +
-  scale_color_manual(values = c("FALSE" = "#1F4E79", "TRUE" = "#FF8C42")) +
-  facet_wrap(~area_for_improvement_ref, nrow = 2, strip.position = "bottom", axis.labels = "all") +
-  theme_minimal() +
-  labs(y = "Percent of PSTs", 
-       x = "Observations with Feedback Containing an Area for Improvement") +
-  scale_y_continuous(expand = c(0, 0), 
-                     breaks = seq(0, 1, by = 0.25),
-                     limits = c(0.0, 1.1),
-                     labels = scales::percent_format()) +
-  theme(text = element_text(family = "LMRoman", color = "black", size = 28),
-        plot.caption = element_text(hjust = 0),
-        axis.text = element_text(color = "black", size = 28),
-        legend.position = "none",
-        strip.text = element_text(face = "bold", size = 28),
-        panel.grid.minor = element_blank())
-ggsave("C:/Users/yaj3ma/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Obs Containing Each AFI Ref.pdf", width = 25, height = 10)
+ggsave(file.path(output_path, "Supervisor BLUPS vs AFI.pdf", width = 11, height = 7.5)

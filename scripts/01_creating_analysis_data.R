@@ -76,10 +76,19 @@ analysis_data <- pst_data %>%
     afi_9_ref = ifelse(area_for_improvement_ref == "Multiple Areas", 1, 0),
     afi_10_ref = ifelse(area_for_improvement_ref == "None", 1, 0),
     
+    # Number of sentences in feedback and reflections
+    n_sentences_feed = ifelse(str_trim(text_feedback) == ".", 0, 
+                              ifelse(str_detect(str_trim(text_feedback), "\\w+$") & !str_detect(str_trim(text_feedback), "[.!?\\r\\n]$"), 1, 
+                                     str_count(text_feedback, "(?<!\\.)[.!?\\r\\n]+(?!\\.)") - 
+                                       str_count(text_feedback, "\\b\\d+\\.$"))),
+    n_sentences_ref = ifelse(str_trim(text_reflection) == ".", 0, 
+                             ifelse(str_detect(str_trim(text_reflection), "\\w+$") & !str_detect(str_trim(text_reflection), "[.!?\\r\\n]$"), 1, 
+                                    str_count(text_reflection, "(?<!\\.)[.!?\\r\\n]+(?!\\.)") - 
+                                      str_count(text_reflection, "\\b\\d+\\.$"))),
+    
     # Add additional variables to be used in the analyses
-    inv_n_obs = 1/nobservations)
-
-#Adding Best Linear Unbiased Predictors (BLUPs)----
+    inv_n_obs = 1/nobservations
+    ) 
 
 # Estimate models predicting average evaluation score with random intercepts for supervisor, PST, and clinical teaching school
 model <- lmer(avg_eval_score_std ~ factor(observation_order) + (1 | supervisor_id) + (1 | pst_id) + (1 | st_school_id), data = analysis_data)
