@@ -81,8 +81,7 @@ class ReflectionAnalyzer:
             }}
     }}
     
-    Critical rule to remember: area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple"
-
+    CRITICAL RULE: area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple". This variable MUST NOT take on any other values.
     '''
 
     def analyze_reflections(self, text, max_retries=3):
