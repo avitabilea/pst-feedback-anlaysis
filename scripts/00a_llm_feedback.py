@@ -79,9 +79,9 @@ class FeedbackAnalyzer:
                 "strengths_mentioned": (boolean indicating if specific strengths are highlighted),
                 "areas_for_growth": (boolean indicating if specific growth areas are identified)
             }}
-    }}
+        }}
     
-    CRITICAL RULE: area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple". This variable MUST NOT take on any other values.
+        CRITICAL RULE: area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple". This variable MUST NOT take on any other values.
     '''
 
     def analyze_feedback(self, text, max_retries=3):

@@ -1,3 +1,4 @@
+*.RDS
 *.env
 *.xlsx
 *.csv
