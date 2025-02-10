@@ -59,7 +59,7 @@ class FeedbackAnalyzer:
         Analyze the text and respond with ONLY a JSON object (no other text) using the following structure:
 
         {{
-            "area_for_improvement": (must be one of: {skills_list}, "other", "none", "multiple"),
+            "area_for_improvement": (MUST be one of: {skills_list}, "other", "none", "multiple"),
             "areas_mentioned": {{
                 "classroom_management": (boolean - true ONLY if feedback suggests improvement needed),
                 "lesson_planning": (boolean - true ONLY if feedback suggests improvement needed),
@@ -79,7 +79,11 @@ class FeedbackAnalyzer:
                 "strengths_mentioned": (boolean indicating if specific strengths are highlighted),
                 "areas_for_growth": (boolean indicating if specific growth areas are identified)
             }}
-    }}'''
+    }}
+    
+    Critical rule to remember: area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple"
+    
+    '''
 
     def analyze_feedback(self, text, max_retries=3):
         if not text or len(text.strip()) < 10:
