@@ -30,19 +30,24 @@ class ReflectionAnalyzer:
 
     def generate_analysis_prompt(self, text):
         skills_list = ", ".join(self.target_skills)
+        valid_values = skills_list + ', "other", "none", "multiple"'
+        
         return f'''You are a researcher that analyzes reflections written by pre-service teachers after classroom observations.
 
         Text to analyze:
         {text}
 
-        Key Analysis Rules:
-        1. area_for_improvement should identify the teaching skill that is most prominently discussed as needing improvement in the reflection
-        - Choose "none" if no areas are identified as needing improvement
-        - Choose "multiple" if 2+ areas are equally emphasized as needing improvement
-        - Choose "other" if the main area for improvement doesn't match the listed skills
-        - Otherwise, choose the single skill most emphasized as needing improvement in the list of target_skills provided
+        STRICT VALIDATION RULES FOR area_for_improvement:
+        - This field must ONLY contain one of these exact values: {valid_values}
+        - Any other value is invalid and will cause system errors
+        - The value must be returned exactly as shown above (case-sensitive)
+        - If multiple skills need improvement equally → use "multiple"
+        - If no skills need improvement → use "none"
+        - If the main improvement area isn't in the skills list → use "other"
+        - Otherwise → use the single most emphasized skill from {skills_list}
 
-        2. areas_mentioned should ONLY be true (1) when the reflection explicitly indicates that skill needs improvement
+        Key Analysis Rules:
+        1. areas_mentioned should ONLY be true (1) when the reflection explicitly indicates that skill needs improvement
         - Set to false (0) if the skill is praised or mentioned positively
         - Set to false (0) if the skill is just mentioned descriptively without suggesting improvement
         - Set to true (1) ONLY if the reflection suggests this specific skill needs improvement
@@ -52,14 +57,14 @@ class ReflectionAnalyzer:
         - "Consider working on your classroom management" → classroom_management: true
         - "You took attendance and managed transitions" → classroom_management: false
         - "While your lesson planning was strong, your classroom management needs work" → 
-            - area_for_improvement: "Classroom Management"
+            - area_for_improvement: "classroom_management"
             - areas_mentioned.classroom_management: true
             - areas_mentioned.lesson_planning: false
 
-        Analyze the text and respond with ONLY a JSON object (no other text) using the following structure:
-
+        RESPONSE FORMAT:
+        Return ONLY a JSON object with this exact structure. No other text allowed.
         {{
-            "area_for_improvement": (must be one of: {skills_list}, "other", "none", "multiple"),
+            "area_for_improvement": (MUST BE ONE OF: {valid_values}),
             "areas_mentioned": {{
                 "classroom_management": (boolean - true ONLY if reflection suggests improvement needed),
                 "lesson_planning": (boolean - true ONLY if reflection suggests improvement needed),
@@ -80,8 +85,10 @@ class ReflectionAnalyzer:
                 "areas_for_growth": (boolean indicating if specific growth areas are identified)
             }}
         }}
-    
-        CRITICAL RULE: area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple". This variable MUST NOT take on any other values.
+
+        FINAL VALIDATION CHECK:
+        Before returning the JSON, verify that area_for_improvement is EXACTLY one of: {valid_values}
+        If not, your response will cause errors.
         '''
 
     def analyze_reflections(self, text, max_retries=3):
@@ -239,7 +246,7 @@ def process_reflection_analysis(input_file, output_file):
 def main():
     load_dotenv()  
     input_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/raw data/PST Data.xlsx"
-    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.02.10 - Reflections Analysis.xlsx"
+    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.02.10 - Reflections Analysis.csv"
     process_reflection_analysis(input_file, output_file)
 
 if __name__ == "__main__":
