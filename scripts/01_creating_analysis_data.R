@@ -14,18 +14,30 @@ conflict_prefer(name = "filter", winner = "dplyr")
 
 #Import data----
 # Publicly-available observation-level file
-pst_data <- read.xlsx(here("raw data", "PST Data.xlsx"))
+pst_data <- read.xlsx(here("raw data", "PST Data.xlsx")) %>% mutate(suspensions_instances = as.numeric(suspensions_instances))
 
 # LLM-analyzed data
 llm_coded_feedback <- read.csv(here("processed data", "2025.02.10 - Feedback Analysis.csv")) %>% 
   rename_with(~ if_else(.x == "observationid", .x, paste0(.x, "_feed"))) %>%
-  select(-text_feed)
-llm_coded_reflections <- read.csv(here("processed data", "2025.02.10 - Reflection Analysis.csv")) %>% 
+  select(-text_feed) %>%
+  # Despite begging, need to reclassify some of the area_for_improvement categorizations (applies to very few)
+  mutate(area_for_improvement_feed = case_when(area_for_improvement_feed %in% c("Closure", "Closure Techniques") ~ "Lesson Planning",
+                                               area_for_improvement_feed %in% c("Questioning", "Questioning Strategies") ~ "Assessment and Feedback",
+                                               area_for_improvement_feed == "Time Management" ~ "Classroom Management",
+                                               area_for_improvement_feed == "Instructional Delivery" ~ "Communication",
+                                               area_for_improvement_feed %in% c("Curriculum Familiarity", "Content Knowledge") ~ "other",
+                                               TRUE ~ area_for_improvement_feed))
+llm_coded_reflections <- read.csv(here("processed data", "2025.02.10 - Reflections Analysis.csv")) %>% 
   rename_with(~ if_else(.x == "observationid", .x, paste0(.x, "_ref"))) %>%
-  select(-text_ref)
-
+  select(-text_ref) %>%
+  # Despite begging, need to reclassify some of the area_for_improvement categorizations (applies to very few)
+  mutate(area_for_improvement_ref = case_when(area_for_improvement_ref %in% c("Closure", "lesson_planning") ~ "Lesson Planning",
+                                              area_for_improvement_ref %in% c("Questioning", "Questioning Strategies") ~ "Assessment and Feedback",
+                                              area_for_improvement_ref %in% c("time management", "time_management", "classroom_management") ~ "Classroom Management",
+                                              area_for_improvement_ref %in% c("Curriculum Familiarity", "Content Knowledge") ~ "other",
+                                               TRUE ~ area_for_improvement_ref))
 #Preparing data----
-
+table(pst_data$race)
 analysis_data <- pst_data %>%
   # Merge in LLM-analyzed data
   left_join(llm_coded_feedback, by = "observationid") %>%
@@ -34,6 +46,14 @@ analysis_data <- pst_data %>%
   # Clean variables
   mutate(
     programcohort = paste(certification, cohort),
+    
+    # Change race to have other
+    race = case_when(race == "Black" ~ "Black",
+                     race == "Hispanic" ~ "Hispanic",
+                     race == "White, Non-Hispanic" ~ "White, Non-Hispanic",
+                     race == "Asian or Pacific Islander" ~ "Asian or Pacific Islander",
+                     race == "Missing" ~ "Missing",
+                     TRUE ~ "Other"),
     
     # Turn categorical variables into factors
     certification = relevel(factor(certification), ref = "EC-6"),
@@ -107,7 +127,7 @@ sd_sch <- as_tibble(VarCorr(model)) %>% filter(grp == "st_school_id") %>% select
 # Standardize BLUPs to mean 0 SD 1 using model-derived standard deviations
 sup_blup_std <- mutate(sup_blup_rate, sup_blup_std = (supervisor_blup-mean(supervisor_blup))/sd_sup) %>% select(supervisor_id, sup_blup_std)
 pst_blup_std <- mutate(pst_blup_rate, pst_blup_std = (pst_blup-mean(pst_blup))/sd_pst) %>% select(pst_id, pst_blup_std)
-sch_blup_std <- mutate(sch_blup_rate, sch_blup_std = (sch_blup-mean(sch_blup))/sd_sch) %>% select(st_school_id, sch_blup)
+sch_blup_std <- mutate(sch_blup_rate, sch_blup_std = (sch_blup-mean(sch_blup))/sd_sch) %>% select(st_school_id, sch_blup_std)
 
 # Add BLUPs to analysis data
 analysis_data <- analysis_data %>%

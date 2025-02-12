@@ -1,40 +1,24 @@
-#Relationship between feedback and evaluation scores----
-
-model1 <- feols(avg_eval_score_std ~ strengths_mentioned | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
-model2 <- feols(avg_eval_score_std ~ strengths_mentioned | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
-model3 <- feols(avg_eval_score_std ~ specific_examples | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
-model4 <- feols(avg_eval_score_std ~ specific_examples | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
-model5 <- feols(avg_eval_score_std ~ areas_for_growth | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
-model6 <- feols(avg_eval_score_std ~ areas_for_growth | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
-model7 <- feols(avg_eval_score_std ~ next_steps | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
-model8 <- feols(avg_eval_score_std ~ next_steps | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
-model9 <- feols(avg_eval_score_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
-model10 <- feols(avg_eval_score_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10)
-
-cm <- c("strengths_mentioned" = "Strength",
-        "specific_examples" = "Specific Examples",
-        "areas_for_growth" = "Area for Improvement",
-        "next_steps" = "Next Steps")
-table <- modelsummary(models = models,
-                      stars = c('*' = .05, '**' = .01, '***' = .001),
-                      coef_map = cm,
-                      gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
-                      gof_map = gm) %>%
-  save_tt("latex")
-table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE) %>% replace_x_with_checkmark()
-writeLines(table, "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/relationship_btw_eval_score_and_feedback.tex")
-
 #Relationship between feedback and supervisor ratings----
 
-analysis_data <- analysis_data %>% group_by(supervisor_id) %>% mutate(n_obs_sup = 1/n()) %>% ungroup()
+analysis_data <- analysis_data %>% group_by(supervisor_id) %>% mutate(n_obs_sup = 1/n(), avg_pst_sup_eval = mean(avg_pst_sup_eval, na.rm=T), avg_coop_sup_eval = mean(avg_coop_sup_eval, na.rm=T)) %>% ungroup() 
+analysis_data <- analysis_data %>% mutate(avg_pst_sup_eval_std = scale(avg_pst_sup_eval), avg_coop_sup_eval_std = scale(avg_coop_sup_eval))
 
 # Standardize evals within cohort and by supervisor
-model1 <- feols(avg_pst_sup_eval_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps + sup_blup_std | observation_order + cohort, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
-model2 <- feols(avg_pst_sup_eval_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps + sup_blup_std | observation_order + cohort + st_school_id, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
-model3 <- feols(avg_coop_sup_eval_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps + sup_blup_std | observation_order + cohort, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
-model4 <- feols(avg_coop_sup_eval_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps + sup_blup_std | observation_order + cohort + st_school_id, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
+model1 <- feols(log(avg_pst_sup_eval) ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed + sup_blup_std | observation_order + cohort, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
+model2 <- feols(log(avg_pst_sup_eval) ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed + sup_blup_std | observation_order + cohort + st_school_id, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
+model3 <- feols(log(avg_coop_sup_eval) ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed + sup_blup_std | observation_order + cohort, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
+model4 <- feols(log(avg_coop_sup_eval) ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed + sup_blup_std | observation_order + cohort + st_school_id, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
 multiariate_models <- list(model1,model2,model3,model4)
+modelsummary(multiariate_models)
+
+
+
+
+
+
+
+
+
 
 model1 <- feols(avg_pst_sup_eval_std ~ strengths_mentioned | observation_order + cohort, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
 model2 <- feols(avg_pst_sup_eval_std ~ specific_examples | observation_order + cohort, data=analysis_data, cluster = "supervisor_id", weight = ~n_obs_sup)
@@ -162,3 +146,30 @@ for (i in seq_along(split_tables)) {
   # Save the LaTeX table
   writeLines(table_chunk, file_name)
 }
+
+#Relationship between feedback and evaluation scores----
+
+model1 <- feols(avg_eval_score_std ~ strengths_mentioned | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
+model2 <- feols(avg_eval_score_std ~ strengths_mentioned | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
+model3 <- feols(avg_eval_score_std ~ specific_examples | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
+model4 <- feols(avg_eval_score_std ~ specific_examples | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
+model5 <- feols(avg_eval_score_std ~ areas_for_growth | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
+model6 <- feols(avg_eval_score_std ~ areas_for_growth | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
+model7 <- feols(avg_eval_score_std ~ next_steps | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
+model8 <- feols(avg_eval_score_std ~ next_steps | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
+model9 <- feols(avg_eval_score_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id")
+model10 <- feols(avg_eval_score_std ~ strengths_mentioned + specific_examples + areas_for_growth + next_steps | pst_id + observation_order, data=analysis_data, cluster = "pst_id")
+models <- list(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10)
+
+cm <- c("strengths_mentioned" = "Strength",
+        "specific_examples" = "Specific Examples",
+        "areas_for_growth" = "Area for Improvement",
+        "next_steps" = "Next Steps")
+table <- modelsummary(models = models,
+                      stars = c('*' = .05, '**' = .01, '***' = .001),
+                      coef_map = cm,
+                      gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
+                      gof_map = gm) %>%
+  save_tt("latex")
+table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE) %>% replace_x_with_checkmark()
+writeLines(table, "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/relationship_btw_eval_score_and_feedback.tex")
