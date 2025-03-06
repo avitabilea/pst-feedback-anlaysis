@@ -52,11 +52,15 @@ class ReflectionAnalyzer:
         - Set to false (0) if the skill is just mentioned descriptively without suggesting improvement
         - Set to true (1) ONLY if the reflection suggests this specific skill needs improvement
 
+        CRITICALLY IMPORTANT NOTE:
+        area_for_improvement can ONLY be one of: {valid_values}
+
         Example interpretations:
-        - "Your classroom management was excellent" → classroom_management: false
-        - "Consider working on your classroom management" → classroom_management: true
-        - "You took attendance and managed transitions" → classroom_management: false
-        - "While your lesson planning was strong, your classroom management needs work" → 
+        - "My classroom management was excellent" → classroom_management: false
+        - "I need to work on my classroom management" → classroom_management: true
+        - "I want to spend more time carefully planning my lessons" → lesson planning: true
+        - "I took attendance and managed transitions" → classroom_management: false
+        - "While my lesson planning was strong, my classroom management needs work" → 
             - area_for_improvement: "classroom_management"
             - areas_mentioned.classroom_management: true
             - areas_mentioned.lesson_planning: false
@@ -66,13 +70,14 @@ class ReflectionAnalyzer:
         {{
             "area_for_improvement": (MUST BE ONE OF: {valid_values}),
             "areas_mentioned": {{
-                "classroom_management": (boolean - true ONLY if reflection suggests improvement needed),
-                "lesson_planning": (boolean - true ONLY if reflection suggests improvement needed),
-                "differentiation": (boolean - true ONLY if reflection suggests improvement needed),
-                "assessment_feedback": (boolean - true ONLY if reflection suggests improvement needed),
-                "student_engagement": (boolean - true ONLY if reflection suggests improvement needed),
-                "student_comprehension": (boolean - true ONLY if reflection suggests improvement needed),
-                "communication": (boolean - true ONLY if reflection suggests improvement needed)
+                "classroom_management": (boolean - true ONLY if reflection suggests improvement in classroom management is needed),
+                "lesson_planning": (boolean - true ONLY if reflection suggests improvement in lesson planning is needed),
+                "differentiation": (boolean - true ONLY if reflection suggests improvement in differentiation is needed),
+                "assessment_feedback": (boolean - true ONLY if reflection suggests improvement in assesement/feedback is needed),
+                "student_engagement": (boolean - true ONLY if reflection suggests improvement in student engagement is  needed),
+                "student_comprehension": (boolean - true ONLY if reflection suggests improvement in student comprehension is needed),
+                "communication": (boolean - true ONLY if reflection suggests improvement in communication is needed),
+                "other": (boolean - true ONLY if reflection suggests improvement in a skill that is not in {skills_list} is needed)
             }},
             "has_areas_for_improvement": (boolean indicating if any specific areas for improvement are mentioned),
             "has_praise": (boolean indicating if there is specific praise for the pre-service teacher),
@@ -85,10 +90,6 @@ class ReflectionAnalyzer:
                 "areas_for_growth": (boolean indicating if specific growth areas are identified)
             }}
         }}
-
-        FINAL VALIDATION CHECK:
-        Before returning the JSON, verify that area_for_improvement is EXACTLY one of: {valid_values}
-        If not, your response will cause errors.
         '''
 
     def analyze_reflections(self, text, max_retries=3):
@@ -179,7 +180,8 @@ def process_reflection_analysis(input_file, output_file):
             'assessment_feedback_mentioned': 0,
             'student_engagement_mentioned': 0,
             'student_comprehension_mentioned': 0,
-            'communication_mentioned': 0
+            'communication_mentioned': 0,
+            'other_mentioned': 0
         }
 
         # Create new DataFrame with observationid and text
@@ -226,6 +228,7 @@ def process_reflection_analysis(input_file, output_file):
                     result_df.at[index, 'student_engagement_mentioned'] = int(areas_mentioned.get('student_engagement', False))
                     result_df.at[index, 'student_comprehension_mentioned'] = int(areas_mentioned.get('student_comprehension', False))
                     result_df.at[index, 'communication_mentioned'] = int(areas_mentioned.get('communication', False))
+                    result_df.at[index, 'other_mentioned'] = int(areas_mentioned.get('other', False))
 
             except Exception as e:
                 print(f"Error processing row {index}: {str(e)}")
@@ -246,7 +249,7 @@ def process_reflection_analysis(input_file, output_file):
 def main():
     load_dotenv()  
     input_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/raw data/PST Data.xlsx"
-    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.02.10 - Reflections Analysis.csv"
+    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.03.04 - Reflections Analysis.csv"
     process_reflection_analysis(input_file, output_file)
 
 if __name__ == "__main__":

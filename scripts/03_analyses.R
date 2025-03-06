@@ -353,18 +353,14 @@ writeLines(table, file.path(output_path, "Variance Decomposition.tex"))
 
 # Relationship between feedback and reflections----
 model1 <- feglm(strengths_mentioned_ref ~ strengths_mentioned_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model2 <- feglm(strengths_mentioned_ref ~ strengths_mentioned_feed | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model3 <- feglm(strengths_mentioned_ref ~ strengths_mentioned_feed | pst_id + observation_order, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model4 <- feglm(specific_examples_ref ~ specific_examples_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model5 <- feglm(specific_examples_ref ~ specific_examples_feed | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model6 <- feglm(specific_examples_ref ~ specific_examples_feed | pst_id + observation_order, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model7 <- feglm(areas_for_growth_ref ~ areas_for_growth_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model8 <- feglm(areas_for_growth_ref ~ areas_for_growth_feed | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model9 <- feglm(areas_for_growth_ref ~ areas_for_growth_feed | pst_id + observation_order, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model10 <- feglm(next_steps_ref ~ next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model11 <- feglm(next_steps_ref ~ next_steps_feed | supervisor_id + observation_order + programcohort, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model12 <- feglm(next_steps_ref ~ next_steps_feed | pst_id + observation_order, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10,model11,model12)
+model2 <- feglm(strengths_mentioned_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
+model3 <- feglm(specific_examples_ref ~ specific_examples_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
+model4 <- feglm(specific_examples_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
+model5 <- feglm(areas_for_growth_ref ~ areas_for_growth_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
+model6 <- feglm(areas_for_growth_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
+model7 <- feglm(next_steps_ref ~ next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
+model8 <- feglm(next_steps_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
+models <- list(model1,model2,model3,model4,model5,model6,model7,model8)
 
 cm <- c("strengths_mentioned_feed" = "\\hspace{3mm} PST Strengths",
         "specific_examples_feed" = "\\hspace{3mm} Specific Examples",

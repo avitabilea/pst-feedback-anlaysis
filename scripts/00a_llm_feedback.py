@@ -30,24 +30,58 @@ class FeedbackAnalyzer:
 
     def generate_analysis_prompt(self, text):
         skills_list = ", ".join(self.target_skills)
-        return f'''You are a researcher that analyzes feedback given to pre-service teachers after classroom observations.
+        return f'''You are a researcher that analyzes the quality and content of feedback given to pre-service teachers after classroom observations.
 
         Text to analyze:
         {text}
 
-        Key Analysis Rules:
+        Analysis Rules for quality indicators:
+        1. quality_indicators should identify whether the feedback contains specific measures that are related to feedback quality (i.e., specific examples, next steps, strengths, and areas for growth)
+        - quality_indicators.specific_examples should flag whether the feedback contains specific examples of things that occurred during the lesson
+        - quality_indicators.next_steps should flag whether the feedback contains clear, actionable next steps for the PST
+        - quality_indicators.strengths should flag whether the feedback contains comments on areas or things that the PST did well
+        - quality_indicators.areas_for_growth should flag whether the feedback contains specific growth areas for the PST to improve upon.
+        - CRITICALLY IMPORTANT: areas_for_growth is a function of area_for_improvement and should only be 1 if area_for_improvement != "none"
+
+        Examples for quality indicators:
+        - "It was good to see you in action with your kids. You were well prepared to lead this lesson. You took a lot of time developing your power point.... 
+        you did not use a lot of words on a slide but devoted space to pictures and maps. By limiting the wordiness in a power point you were able to make your lesson points verbally 
+        and use the slides as a way of illustrating those.... much more visually captivating that something kids have to read on screen. Great visuals. 
+        You noted in your journal that you were comfortable speaking to groups and it shows with your relaxed manner in front of the class."
+            - quality_indicators.specific_examples: true
+            - quality_indicators.next_steps: false
+            - quality_indicators.strengths: true
+            - quality_indicators.areas_for_growth: false
+
+        - "is making good progress. She is displaying the confidence and presence to be a good teacher. Classroom management is a concern with the one class I visited.   
+        We talked about options with myself and cooperating teacher, nothing bad but she just needs to get a better handle on certain students.   
+        I know her other classes are not as the one I visited is, so I look forward to observing other classes."
+            - quality_indicators.specific_examples: false
+            - quality_indicators.next_steps: false
+            - quality_indicators.strengths: true
+            - quality_indicators.areas_for_growth: true
+
+        Analysis Rules for Area for Improvement:
         1. area_for_improvement should identify the teaching skill that is most prominently discussed as needing improvement in the feedback
         - Choose "none" if no areas are identified as needing improvement
         - Choose "multiple" if 2+ areas are equally emphasized as needing improvement
         - Choose "other" if the main area for improvement doesn't match the listed skills
         - Otherwise, choose the single skill most emphasized as needing improvement in the list of target_skills provided
+        - CRITICALLY IMPORTANT area_for_improvement should be a function of areas_mentioned. For example, if there are multiple areas_mentioned flagged as true, this should be "multiple"
+        - CRITICALLY IMPORTANT area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple". This variable MUST NOT take on any other values.
 
-        2. areas_mentioned should ONLY be true (1) when the feedback explicitly indicates that skill needs improvement
+        2. areas_mentioned should ONLY be true (1) when the feedback explicitly indicates that a skill needs improvement
         - Set to false (0) if the skill is praised or mentioned positively
         - Set to false (0) if the skill is just mentioned descriptively without suggesting improvement
         - Set to true (1) ONLY if the feedback suggests this specific skill needs improvement
 
         Example interpretations:
+        - "is making good progress. She is displaying the confidence and presence to be a good teacher. Classroom management is a concern with the one class I visited.   
+        We talked about options with myself and cooperating teacher, nothing bad but she just needs to get a better handle on certain students.   
+        I know her other classes are not as the one I visited is, so I look forward to observing other classes."
+            - area_for_improvement: "Classroom Management"
+            - areas_mentioned.classroom_management: true
+            - areas_mentioned.lesson_planning: false
         - "Your classroom management was excellent" → classroom_management: false
         - "Consider working on your classroom management" → classroom_management: true
         - "You took attendance and managed transitions" → classroom_management: false
@@ -61,27 +95,22 @@ class FeedbackAnalyzer:
         {{
             "area_for_improvement": (MUST be one of: {skills_list}, "other", "none", "multiple"),
             "areas_mentioned": {{
-                "classroom_management": (boolean - true ONLY if feedback suggests improvement needed),
-                "lesson_planning": (boolean - true ONLY if feedback suggests improvement needed),
-                "differentiation": (boolean - true ONLY if feedback suggests improvement needed),
-                "assessment_feedback": (boolean - true ONLY if feedback suggests improvement needed),
-                "student_engagement": (boolean - true ONLY if feedback suggests improvement needed),
-                "student_comprehension": (boolean - true ONLY if feedback suggests improvement needed),
-                "communication": (boolean - true ONLY if feedback suggests improvement needed)
+                "classroom_management": (boolean - true ONLY if feedback suggests improvement in classroom management is needed),
+                "lesson_planning": (boolean - true ONLY if feedback suggests improvement in lesson planning is needed),
+                "differentiation": (boolean - true ONLY if feedback suggests improvement in differentiation is needed),
+                "assessment_feedback": (boolean - true ONLY if feedback suggests improvement in assesement/feedback is needed),
+                "student_engagement": (boolean - true ONLY if feedback suggests improvement in student engagement is  needed),
+                "student_comprehension": (boolean - true ONLY if feedback suggests improvement in student comprehension is needed),
+                "communication": (boolean - true ONLY if feedback suggests improvement in communication is needed),
+                "other": (boolean - true ONLY if feedback suggests improvement in a skill that is not in {skills_list} is needed)
             }},
-            "has_areas_for_improvement": (boolean indicating if any specific areas for improvement are mentioned),
-            "has_praise": (boolean indicating if there is specific praise for the pre-service teacher),
-            "has_lesson_retelling": (boolean indicating if the text mainly retells what happened in the lesson),
-            "has_admin_notes": (boolean indicating if the text contains administrative or logistical notes),
-            "evidence": {{
+            "quality_indicators": {{
                 "specific_examples": (boolean indicating if concrete examples from lesson are provided),
                 "next_steps": (boolean indicating if practical and actionable next steps are suggested),
                 "strengths_mentioned": (boolean indicating if specific strengths are highlighted),
                 "areas_for_growth": (boolean indicating if specific growth areas are identified)
             }}
         }}
-    
-        CRITICAL RULE: area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple". This variable MUST NOT take on any other values.
     '''
 
     def analyze_feedback(self, text, max_retries=3):
@@ -90,11 +119,7 @@ class FeedbackAnalyzer:
             return {
                 "area_for_improvement": "none",
                 "areas_mentioned": empty_areas,
-                "has_areas_for_improvement": False,
-                "has_praise": False,
-                "has_lesson_retelling": False,
-                "has_admin_notes": False,
-                "evidence": {
+                "quality_indicators": {
                     "specific_examples": False,
                     "next_steps": False,
                     "strengths_mentioned": False,
@@ -156,10 +181,6 @@ def process_feedback_analysis(input_file, output_file):
             'area_for_improvement': 'none',
             
             # Binary indicators (0/1)
-            'has_areas_for_improvement': 0,
-            'has_praise': 0,
-            'has_lesson_retelling': 0,
-            'has_admin_notes': 0,
             'specific_examples': 0,
             'next_steps': 0,
             'strengths_mentioned': 0,
@@ -172,7 +193,8 @@ def process_feedback_analysis(input_file, output_file):
             'assessment_feedback_mentioned': 0,
             'student_engagement_mentioned': 0,
             'student_comprehension_mentioned': 0,
-            'communication_mentioned': 0
+            'communication_mentioned': 0,
+            'other_mentioned': 0
         }
 
         # Create new DataFrame with observationid and text
@@ -196,19 +218,13 @@ def process_feedback_analysis(input_file, output_file):
                 if analysis_result:
                     # Update area_for_improvement
                     result_df.at[index, 'area_for_improvement'] = analysis_result.get('area_for_improvement', 'none')
-                    
-                    # Update binary indicators
-                    result_df.at[index, 'has_areas_for_improvement'] = int(analysis_result.get('has_areas_for_improvement', False))
-                    result_df.at[index, 'has_praise'] = int(analysis_result.get('has_praise', False))
-                    result_df.at[index, 'has_lesson_retelling'] = int(analysis_result.get('has_lesson_retelling', False))
-                    result_df.at[index, 'has_admin_notes'] = int(analysis_result.get('has_admin_notes', False))
 
-                    # Update evidence markers
-                    evidence = analysis_result.get('evidence', {})
-                    result_df.at[index, 'specific_examples'] = int(evidence.get('specific_examples', False))
-                    result_df.at[index, 'next_steps'] = int(evidence.get('next_steps', False))
-                    result_df.at[index, 'strengths_mentioned'] = int(evidence.get('strengths_mentioned', False))
-                    result_df.at[index, 'areas_for_growth'] = int(evidence.get('areas_for_growth', False))
+                    # Update quality_indicators markers
+                    quality_indicators = analysis_result.get('quality_indicators', {})
+                    result_df.at[index, 'specific_examples'] = int(quality_indicators.get('specific_examples', False))
+                    result_df.at[index, 'next_steps'] = int(quality_indicators.get('next_steps', False))
+                    result_df.at[index, 'strengths_mentioned'] = int(quality_indicators.get('strengths_mentioned', False))
+                    result_df.at[index, 'areas_for_growth'] = int(quality_indicators.get('areas_for_growth', False))
 
                     # Update area-specific indicators
                     areas_mentioned = analysis_result.get('areas_mentioned', {})
@@ -219,6 +235,7 @@ def process_feedback_analysis(input_file, output_file):
                     result_df.at[index, 'student_engagement_mentioned'] = int(areas_mentioned.get('student_engagement', False))
                     result_df.at[index, 'student_comprehension_mentioned'] = int(areas_mentioned.get('student_comprehension', False))
                     result_df.at[index, 'communication_mentioned'] = int(areas_mentioned.get('communication', False))
+                    result_df.at[index, 'other_mentioned'] = int(areas_mentioned.get('other', False))
 
             except Exception as e:
                 print(f"Error processing row {index}: {str(e)}")
@@ -239,7 +256,7 @@ def process_feedback_analysis(input_file, output_file):
 def main():
     load_dotenv()
     input_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/raw data/PST Data.xlsx"
-    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.02.10 - Feedback Analysis.csv"
+    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.03.05 - Feedback Analysis.csv"
     process_feedback_analysis(input_file, output_file)
 
 if __name__ == "__main__":
