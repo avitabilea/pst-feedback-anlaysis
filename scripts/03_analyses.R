@@ -4,7 +4,7 @@
 
 #General----
 #Load packages
-pacman::p_load(conflicted, here, tidyverse, fixest, modelsummary, tinytable, car, gtheory)
+pacman::p_load(conflicted, here, tidyverse, sandwich, lmtest, modelsummary, tinytable, car)
 
 # Remove everything
 rm(list=ls())
@@ -53,24 +53,59 @@ gm_bi <- tibble::tribble(
 #Load data
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
 
+# Define a function to fit clustered models
+fit_clustered_model <- function(formula, data, cluster_var) {
+  # Convert the formula to a character string to analyze it
+  formula_str <- as.character(formula)
+  
+  # Determine the dependent variable name
+  dep_var <- formula_str[2]
+  
+  # Count the number of coefficients by creating a model matrix
+  model_matrix <- model.matrix(formula, data)
+  n_coefs <- ncol(model_matrix)
+  
+  # Fit the model using glm with log link and appropriate starting values
+  model <- try(glm(
+    formula, 
+    data = data, 
+    family = binomial(link = "log"),
+    start = c(log(mean(data[[dep_var]])), rep(0, n_coefs - 1))
+  ), silent = TRUE)
+  
+  # Apply clustered standard errors
+  clustered_vcov <- vcovCL(model, cluster = data[[cluster_var]])
+  clustered_model <- list(
+    model = model,
+    vcov = clustered_vcov
+  )
+  
+  return(clustered_model)
+}
+
 #Predicting feedback----
-
 # Observation order
-model1 <- feglm(strengths_mentioned_feed ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model2 <- feglm(specific_examples_feed ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model3 <- feglm(areas_for_growth_feed ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model4 <- feglm(next_steps_feed ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model5 <- feglm(strengths_mentioned_ref ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model6 <- feglm(specific_examples_ref ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model7 <- feglm(areas_for_growth_ref ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model8 <- feglm(next_steps_ref ~ i(observation_order, ref = 1), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8)
+model1 <- fit_clustered_model(strengths_mentioned_feed ~ factor(observation_order), analysis_data, "pst_id")
+model2 <- fit_clustered_model(specific_examples_feed ~ factor(observation_order), analysis_data, "pst_id")
+model3 <- fit_clustered_model(areas_for_growth_feed ~ factor(observation_order), analysis_data, "pst_id")
+model4 <- fit_clustered_model(next_steps_feed ~ factor(observation_order), analysis_data, "pst_id")
+model5 <- fit_clustered_model(strengths_mentioned_ref ~ factor(observation_order), analysis_data, "pst_id")
+model6 <- fit_clustered_model(specific_examples_ref ~ factor(observation_order), analysis_data, "pst_id")
+model7 <- fit_clustered_model(areas_for_growth_ref ~ factor(observation_order), analysis_data, "pst_id")
+model8 <- fit_clustered_model(next_steps_ref ~ factor(observation_order), analysis_data, "pst_id")
 
-cm <- c("observation_order::2" = "\\hspace{3mm} 2",
-        "observation_order::3" = "\\hspace{3mm} 3",
-        "observation_order::4" = "\\hspace{3mm} 4")
-table <- modelsummary(models = models,
-                      exponentiate = T,
+# Extract the model objects for modelsummary
+models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
+
+# Create a list of vcov matrices for modelsummary
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+
+cm <- c("factor(observation_order)2" = "\\hspace{3mm} 2",
+        "factor(observation_order)3" = "\\hspace{3mm} 3",
+        "factor(observation_order)4" = "\\hspace{3mm} 4")
+table <- modelsummary(models = models, 
+                      vcov = vcov_list,
+                      exponentiate = TRUE,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
                       gof_omit = '.') %>%
@@ -79,21 +114,25 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 writeLines(table, file.path(output_path, "Pred_feedback_1_obs_order.tex"))
 
 # Cert area
-model1 <- feglm(strengths_mentioned_feed ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model2 <- feglm(specific_examples_feed ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model3 <- feglm(areas_for_growth_feed ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model4 <- feglm(next_steps_feed ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model5 <- feglm(strengths_mentioned_ref ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model6 <- feglm(specific_examples_ref ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model7 <- feglm(areas_for_growth_ref ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model8 <- feglm(next_steps_ref ~ i(certification, ref = "EC-6"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8)
+model1 <- fit_clustered_model(strengths_mentioned_feed ~ factor(certification), analysis_data, "pst_id")
+model2 <- fit_clustered_model(specific_examples_feed ~ factor(certification), analysis_data, "pst_id")
+model3 <- fit_clustered_model(areas_for_growth_feed ~ factor(certification), analysis_data, "pst_id")
+model4 <- fit_clustered_model(next_steps_feed ~ factor(certification), analysis_data, "pst_id")
+model5 <- fit_clustered_model(strengths_mentioned_ref ~ factor(certification), analysis_data, "pst_id")
+model6 <- fit_clustered_model(specific_examples_ref ~ factor(certification), analysis_data, "pst_id")
+model7 <- fit_clustered_model(areas_for_growth_ref ~ factor(certification), analysis_data, "pst_id")
+model8 <- fit_clustered_model(next_steps_ref ~ factor(certification), analysis_data, "pst_id")
 
-cm <- c("certification::4-8 English/SS" = "\\hspace{3mm} 4-8 English/SS",
-        "certification::4-8 Math/Sci" = "\\hspace{3mm} 4-8 Math/Sci",
-        "certification::HS Subjects" = "\\hspace{3mm} HS Subjects")
+# Extract models and vcov
+models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+
+cm <- c("factor(certification)4-8 English/SS" = "\\hspace{3mm} 4-8 English/SS",
+        "factor(certification)4-8 Math/Sci" = "\\hspace{3mm} 4-8 Math/Sci",
+        "factor(certification)HS Subjects" = "\\hspace{3mm} HS Subjects")
 table <- modelsummary(models = models,
-                      exponentiate = T,
+                      vcov = vcov_list,
+                      exponentiate = TRUE,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
                       gof_omit = '.') %>%
@@ -102,21 +141,25 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 writeLines(table, file.path(output_path, "Pred_feedback_2_cert_area.tex"))
 
 # BLUPs
-model1 <- feglm(strengths_mentioned_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model2 <- feglm(specific_examples_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model3 <- feglm(areas_for_growth_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model4 <- feglm(next_steps_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model5 <- feglm(strengths_mentioned_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model6 <- feglm(specific_examples_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model7 <- feglm(areas_for_growth_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model8 <- feglm(next_steps_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8)
+model1 <- fit_clustered_model(strengths_mentioned_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+model2 <- fit_clustered_model(specific_examples_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+model3 <- fit_clustered_model(areas_for_growth_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+model4 <- fit_clustered_model(next_steps_feed ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+model5 <- fit_clustered_model(strengths_mentioned_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+model6 <- fit_clustered_model(specific_examples_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+model7 <- fit_clustered_model(areas_for_growth_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+model8 <- fit_clustered_model(next_steps_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
+
+# Extract models and vcov
+models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
 
 cm <- c("pst_blup_std" = "\\hspace{3mm} PST",
         "sup_blup_std" = "\\hspace{3mm} Supervisor",
         "sch_blup_std" = "\\hspace{3mm} Placement School")
 table <- modelsummary(models = models,
-                      exponentiate = T,
+                      vcov = vcov_list,
+                      exponentiate = TRUE,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
                       gof_omit = '.') %>%
@@ -125,21 +168,25 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 writeLines(table, file.path(output_path, "Pred_feedback_3_blups.tex"))
 
 # Student teaching school
-model1 <- feglm(strengths_mentioned_feed ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model2 <- feglm(specific_examples_feed ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model3 <- feglm(areas_for_growth_feed ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model4 <- feglm(next_steps_feed ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model5 <- feglm(strengths_mentioned_ref ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model6 <- feglm(specific_examples_ref ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model7 <- feglm(areas_for_growth_ref ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model8 <- feglm(next_steps_ref ~ st_advantage_index + suspensions_instances + st_local, data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8)
+model1 <- fit_clustered_model(strengths_mentioned_feed ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+model2 <- fit_clustered_model(specific_examples_feed ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+model3 <- fit_clustered_model(areas_for_growth_feed ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+model4 <- fit_clustered_model(next_steps_feed ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+model5 <- fit_clustered_model(strengths_mentioned_ref ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+model6 <- fit_clustered_model(specific_examples_ref ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+model7 <- fit_clustered_model(areas_for_growth_ref ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+model8 <- fit_clustered_model(next_steps_ref ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
+
+# Extract models and vcov
+models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
 
 cm <- c("st_advantage_index" = "\\hspace{3mm} Standardized Advantage Index",
         "suspensions_instances" = "\\hspace{3mm} Standardized Suspensions",
         "st_local" = "\\hspace{3mm} Local District")
 table <- modelsummary(models = models,
-                      exponentiate = T,
+                      vcov = vcov_list,
+                      exponentiate = TRUE,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
                       gof_omit = '.') %>%
@@ -148,29 +195,39 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 writeLines(table, file.path(output_path, "Pred_feedback_4_placement_school.tex"))
 
 # PST demographics
-model1 <- feglm(strengths_mentioned_feed ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model2 <- feglm(specific_examples_feed ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model3 <- feglm(areas_for_growth_feed ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model4 <- feglm(next_steps_feed ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model5 <- feglm(strengths_mentioned_ref ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model6 <- feglm(specific_examples_ref ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model7 <- feglm(areas_for_growth_ref ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-model8 <- feglm(next_steps_ref ~ i(sex, ref = "Female") + i(race, ref = "White") + i(sat_score_cat, ref = "1000-1290"), data = analysis_data, family = binomial(link = "logit"), cluster = "pst_id")
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8)
+model1 <- fit_clustered_model(strengths_mentioned_feed ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
+model2 <- fit_clustered_model(specific_examples_feed ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
+model3 <- fit_clustered_model(areas_for_growth_feed ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
+model4 <- fit_clustered_model(next_steps_feed ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
+model5 <- fit_clustered_model(strengths_mentioned_ref ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
+model6 <- fit_clustered_model(specific_examples_ref ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
+model7 <- fit_clustered_model(areas_for_growth_ref ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
+model8 <- fit_clustered_model(next_steps_ref ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
 
-cm <- c("sex::Male" = "\\hspace{3mm} Male",
-        "race::Hispanic" = "\\hspace{3mm} Hispanic",
-        "race::Black" = "\\hspace{3mm} Black",
-        "race::Asian or Pacific Islander" = "\\hspace{3mm} Asian or Pacific Islander",
-        "race::Other" = "\\hspace{3mm} Other",
-        "sat_score_cat::<1000" = "\\hspace{3mm} Less than 1000",
-        "sat_score_cat::1300-1600" = "\\hspace{3mm} 1300 to 1600")
+# Extract models and vcov
+models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+
+outcome_means <- tibble::tribble(
+  ~term,           ~model1,                                             ~model2,                                           ~model3,                                          ~model4,                                        ~model5,                                             ~model6,                                           ~model7,                                          ~model8,
+  "Outcome Mean",  mean(analysis_data$strengths_mentioned_feed, na.rm = TRUE), mean(analysis_data$specific_examples_feed, na.rm = TRUE), mean(analysis_data$areas_for_growth_feed, na.rm = TRUE), mean(analysis_data$next_steps_feed, na.rm = TRUE), mean(analysis_data$strengths_mentioned_ref, na.rm = TRUE), mean(analysis_data$specific_examples_ref, na.rm = TRUE), mean(analysis_data$areas_for_growth_ref, na.rm = TRUE), mean(analysis_data$next_steps_ref, na.rm = TRUE)
+)
+
+cm <- c("factor(sex)Male" = "\\hspace{3mm} Male",
+        "factor(race)Hispanic" = "\\hspace{3mm} Hispanic",
+        "factor(race)Black" = "\\hspace{3mm} Black",
+        "factor(race)Asian or Pacific Islander" = "\\hspace{3mm} Asian or Pacific Islander",
+        "factor(race)Other" = "\\hspace{3mm} Other",
+        "factor(sat_score_cat)<1000" = "\\hspace{3mm} Less than 1000",
+        "factor(sat_score_cat)1300-1600" = "\\hspace{3mm} 1300 to 1600")
 table <- modelsummary(models = models,
-                      exponentiate = T,
+                      vcov = vcov_list,
+                      exponentiate = TRUE,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
                       gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
-                      gof_map = gm) %>%
+                      gof_map = gm,
+                      add_rows = outcome_means) %>%
   group_tt(i = list("\\hspace{1mm} \\textit{Sex (Base = Female)}" = 1,
                     "\\hspace{1mm} \\textit{Race/Ethnicity (Base = White)}" = 3,
                     "\\hspace{1mm} \\textit{SAT Score (Base = 1000 to 1290)}" = 11)) %>%
@@ -179,8 +236,8 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 writeLines(table, file.path(output_path, "Pred_feedback_5_demographics.tex"))
 
 #Predicting evaluation score----
-model1 <- feols(avg_eval_score_std ~ area_for_improvement_feed | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model2 <- feols(avg_eval_score_std ~ area_for_improvement_feed | pst_id + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model1 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model2 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model3 <- feols(avg_eval_score_std ~ area_for_improvement_feed | supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
 model4 <- feols(avg_eval_score_std ~ area_for_improvement_feed | pst_id + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
 
@@ -246,12 +303,12 @@ writeLines(table, file.path(output_path, "Pred_Eval_Score.tex"))
 
 #Predicting outcomes----
 # Run all regressions
-model1 <- feols(examscore_std_ppr ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model2 <- feols(examscore_std_req ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model3 <- feols(ever_enter_teaching ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model4 <- feols(enter_teaching_imm ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model5 <- feols(same_school ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model6 <- feols(advantage_index ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model1 <- feols(examscore_std_ppr ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model2 <- feols(examscore_std_req ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model3 <- feols(ever_enter_teaching ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model4 <- feols(enter_teaching_imm ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model5 <- feols(same_school ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model6 <- feols(advantage_index ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model7 <- feols(examscore_std_ppr ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
 model8 <- feols(examscore_std_req ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
 model9 <- feols(ever_enter_teaching ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)

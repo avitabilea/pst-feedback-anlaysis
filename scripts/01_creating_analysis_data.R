@@ -17,7 +17,7 @@ conflict_prefer(name = "filter", winner = "dplyr")
 pst_data <- read.xlsx(here("raw data", "PST Data.xlsx")) %>% mutate(suspensions_instances = as.numeric(suspensions_instances))
 
 # LLM-analyzed data
-llm_coded_feedback <- read.csv(here("processed data", "2025.02.10 - Feedback Analysis.csv")) %>% 
+llm_coded_feedback <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) %>% 
   rename_with(~ if_else(.x == "observationid", .x, paste0(.x, "_feed"))) %>%
   select(-text_feed) %>%
   # Despite begging, need to reclassify some of the area_for_improvement categorizations (applies to very few)
@@ -27,15 +27,17 @@ llm_coded_feedback <- read.csv(here("processed data", "2025.02.10 - Feedback Ana
                                                area_for_improvement_feed == "Instructional Delivery" ~ "Communication",
                                                area_for_improvement_feed %in% c("Curriculum Familiarity", "Content Knowledge") ~ "other",
                                                TRUE ~ area_for_improvement_feed))
-llm_coded_reflections <- read.csv(here("processed data", "2025.02.10 - Reflections Analysis.csv")) %>% 
+
+llm_coded_reflections <- read.csv(here("processed data", "2025.03.06 - Reflections Analysis.csv")) %>% 
   rename_with(~ if_else(.x == "observationid", .x, paste0(.x, "_ref"))) %>%
   select(-text_ref) %>%
   # Despite begging, need to reclassify some of the area_for_improvement categorizations (applies to very few)
   mutate(area_for_improvement_ref = case_when(area_for_improvement_ref %in% c("Closure", "lesson_planning") ~ "Lesson Planning",
                                               area_for_improvement_ref %in% c("Questioning", "Questioning Strategies") ~ "Assessment and Feedback",
-                                              area_for_improvement_ref %in% c("time management", "time_management", "classroom_management") ~ "Classroom Management",
-                                              area_for_improvement_ref %in% c("Curriculum Familiarity", "Content Knowledge") ~ "other",
+                                              area_for_improvement_ref %in% c("Time Management", "time management", "time_management", "classroom_management") ~ "Classroom Management",
+                                              area_for_improvement_ref %in% c("Organization", "Curriculum Familiarity", "Content Knowledge") ~ "other",
                                                TRUE ~ area_for_improvement_ref))
+
 #Preparing data----
 table(pst_data$race)
 analysis_data <- pst_data %>%
@@ -108,7 +110,21 @@ analysis_data <- pst_data %>%
     
     # Add additional variables to be used in the analyses
     inv_n_obs = 1/nobservations
-    ) 
+    ) %>%
+  # No area for improvement flagged using binary indicators
+  mutate(no_afi_mentioned_feed = if_else(
+    rowSums(select(., classroom_management_mentioned_feed, 
+                   lesson_planning_mentioned_feed, differentiation_mentioned_feed, 
+                   assessment_feedback_mentioned_feed, student_engagement_mentioned_feed, 
+                   student_comprehension_mentioned_feed, communication_mentioned_feed, 
+                   other_mentioned_feed)) == 0, 1, 0),
+    no_afi_mentioned_ref = if_else(
+      rowSums(select(., classroom_management_mentioned_ref, 
+                     lesson_planning_mentioned_ref, differentiation_mentioned_ref, 
+                     assessment_feedback_mentioned_ref, student_engagement_mentioned_ref, 
+                     student_comprehension_mentioned_ref, communication_mentioned_ref, 
+                     other_mentioned_ref)) == 0, 1, 0))
+  
 
 # Estimate models predicting average evaluation score with random intercepts for supervisor, PST, and clinical teaching school
 model <- lmer(avg_eval_score_std ~ factor(observation_order) + (1 | supervisor_id) + (1 | pst_id) + (1 | st_school_id), data = analysis_data)

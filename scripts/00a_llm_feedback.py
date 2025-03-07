@@ -30,7 +30,7 @@ class FeedbackAnalyzer:
 
     def generate_analysis_prompt(self, text):
         skills_list = ", ".join(self.target_skills)
-        return f'''You are a researcher that analyzes the quality and content of feedback given to pre-service teachers after classroom observations.
+        return f'''You are a researcher that analyzes the quality and content of feedback given to pre-service teachers (PSTs) after classroom observations.
 
         Text to analyze:
         {text}

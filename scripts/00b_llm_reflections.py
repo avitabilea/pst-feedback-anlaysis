@@ -32,58 +32,82 @@ class ReflectionAnalyzer:
         skills_list = ", ".join(self.target_skills)
         valid_values = skills_list + ', "other", "none", "multiple"'
         
-        return f'''You are a researcher that analyzes reflections written by pre-service teachers after classroom observations.
+        return f'''You are a researcher that analyzes reflections written by pre-service teachers (PSTs) after classroom observations.
 
         Text to analyze:
         {text}
 
-        STRICT VALIDATION RULES FOR area_for_improvement:
-        - This field must ONLY contain one of these exact values: {valid_values}
-        - Any other value is invalid and will cause system errors
-        - The value must be returned exactly as shown above (case-sensitive)
-        - If multiple skills need improvement equally → use "multiple"
-        - If no skills need improvement → use "none"
-        - If the main improvement area isn't in the skills list → use "other"
-        - Otherwise → use the single most emphasized skill from {skills_list}
+        Analysis Rules for quality indicators:
+        1. quality_indicators should identify whether the reflection contains specific measures that are related to reflection quality (i.e., specific examples, next steps, strengths, and areas for growth)
+        - quality_indicators.specific_examples should flag whether the reflection contains specific examples of things that occurred during the lesson
+        - quality_indicators.next_steps should flag whether the reflection contains clear, actionable next steps for the PST
+        - quality_indicators.strengths should flag whether the reflection contains comments on areas or things that the PST did well
+        - quality_indicators.areas_for_growth should flag whether the reflection contains specific growth areas for the PST to improve upon.
+        - CRITICALLY IMPORTANT: areas_for_growth is a function of area_for_improvement and should only be 1 if area_for_improvement != "none"
 
-        Key Analysis Rules:
-        1. areas_mentioned should ONLY be true (1) when the reflection explicitly indicates that skill needs improvement
+        Examples for quality indicators:
+        - "One thing that I think I do well is giving examples that the students can relate to in order to keep them engaged. I think that I have good discipline and my students 
+           really respect me because of it. I think that I also had good energy. It is so much easier to keep students engaged when you are excited about what you are teaching. 
+           I need to get better about blatantly stating the objective. I can seem to use the right phrasing."
+            - quality_indicators.specific_examples: false
+            - quality_indicators.next_steps: false
+            - quality_indicators.strengths: true
+            - quality_indicators.areas_for_growth: true
+
+        - "This day wasn't as great of a "lesson" exactly. They way timing worked out with schedules and 9 - week exams just forced us in to a corner on this one. 
+           Nevertheless, I still found a way to bring in some teaching points. The students did test corrections, and taught me how to analyze the data to go over the most missed questions, 
+           and evaluate what may have caused the mistakes. I took those most missed questions and showed the kids what they did wrong with the use of the document camera and the smart board. 
+           It was somewhat dry at times, but I noticed I got a lot of faces lighting up and noises when we went back through the questions together. 
+           It was nice to see my students learning from their mistakes, and because of this process their grades improve on every test for the most part."
+            - quality_indicators.specific_examples: true
+            - quality_indicators.next_steps: false
+            - quality_indicators.strengths: true
+            - quality_indicators.areas_for_growth: false
+
+        Analysis Rules for Area for Improvement:
+        1. area_for_improvement should identify the teaching skill that is most prominently discussed as needing improvement in the reflection
+        - Choose "none" if no areas are identified as needing improvement
+        - Choose "multiple" if 2+ areas are equally emphasized as needing improvement
+        - Choose "other" if the main area for improvement doesn't match the listed skills
+        - Otherwise, choose the single skill most emphasized as needing improvement in the list of target_skills provided
+        - CRITICALLY IMPORTANT area_for_improvement should be a function of areas_mentioned. For example, if there are multiple areas_mentioned flagged as true, this should be "multiple"
+        - CRITICALLY IMPORTANT area_for_improvement can ONLY be {skills_list}, "other", "none", or "multiple". This variable MUST NOT take on any other values.
+
+        2. areas_mentioned should ONLY be true (1) when the reflection explicitly indicates that a skill needs improvement
         - Set to false (0) if the skill is praised or mentioned positively
         - Set to false (0) if the skill is just mentioned descriptively without suggesting improvement
         - Set to true (1) ONLY if the reflection suggests this specific skill needs improvement
 
-        CRITICALLY IMPORTANT NOTE:
-        area_for_improvement can ONLY be one of: {valid_values}
-
         Example interpretations:
+        - "My classroom management (using hand signals, certain phrases) is getting better with time. The math subject has always made me nervous to teach, but as I practice teaching 
+           it more I am getting more confident in teaching math and math strategies. What I would have done differently (and what I need to improve on) is time management and keeping station time / 
+           teacher table around 15 - 20 minutes. My goal is to keep better track of students' activities in stations while I am at the teacher table (and redirecting off - task behavior in these stations)."
+            - area_for_improvement: "Classroom Management"
+            - areas_mentioned.classroom_management: true
+            - areas_mentioned.lesson_planning: false
         - "My classroom management was excellent" → classroom_management: false
         - "I need to work on my classroom management" → classroom_management: true
-        - "I want to spend more time carefully planning my lessons" → lesson planning: true
         - "I took attendance and managed transitions" → classroom_management: false
         - "While my lesson planning was strong, my classroom management needs work" → 
-            - area_for_improvement: "classroom_management"
+            - area_for_improvement: "Classroom Management"
             - areas_mentioned.classroom_management: true
             - areas_mentioned.lesson_planning: false
 
-        RESPONSE FORMAT:
-        Return ONLY a JSON object with this exact structure. No other text allowed.
+        Analyze the text and respond with ONLY a JSON object (no other text) using the following structure:
+
         {{
-            "area_for_improvement": (MUST BE ONE OF: {valid_values}),
+            "area_for_improvement": (MUST be one of: {skills_list}, "other", "none", "multiple"),
             "areas_mentioned": {{
-                "classroom_management": (boolean - true ONLY if reflection suggests improvement in classroom management is needed),
-                "lesson_planning": (boolean - true ONLY if reflection suggests improvement in lesson planning is needed),
-                "differentiation": (boolean - true ONLY if reflection suggests improvement in differentiation is needed),
-                "assessment_feedback": (boolean - true ONLY if reflection suggests improvement in assesement/feedback is needed),
-                "student_engagement": (boolean - true ONLY if reflection suggests improvement in student engagement is  needed),
-                "student_comprehension": (boolean - true ONLY if reflection suggests improvement in student comprehension is needed),
-                "communication": (boolean - true ONLY if reflection suggests improvement in communication is needed),
-                "other": (boolean - true ONLY if reflection suggests improvement in a skill that is not in {skills_list} is needed)
+                "classroom_management": (boolean - true ONLY if feedback suggests improvement in classroom management is needed),
+                "lesson_planning": (boolean - true ONLY if feedback suggests improvement in lesson planning is needed),
+                "differentiation": (boolean - true ONLY if feedback suggests improvement in differentiation is needed),
+                "assessment_feedback": (boolean - true ONLY if feedback suggests improvement in assesement/feedback is needed),
+                "student_engagement": (boolean - true ONLY if feedback suggests improvement in student engagement is  needed),
+                "student_comprehension": (boolean - true ONLY if feedback suggests improvement in student comprehension is needed),
+                "communication": (boolean - true ONLY if feedback suggests improvement in communication is needed),
+                "other": (boolean - true ONLY if feedback suggests improvement in a skill that is not in {skills_list} is needed)
             }},
-            "has_areas_for_improvement": (boolean indicating if any specific areas for improvement are mentioned),
-            "has_praise": (boolean indicating if there is specific praise for the pre-service teacher),
-            "has_lesson_retelling": (boolean indicating if the text mainly retells what happened in the lesson),
-            "has_admin_notes": (boolean indicating if the text contains administrative or logistical notes),
-            "evidence": {{
+            "quality_indicators": {{
                 "specific_examples": (boolean indicating if concrete examples from lesson are provided),
                 "next_steps": (boolean indicating if practical and actionable next steps are suggested),
                 "strengths_mentioned": (boolean indicating if specific strengths are highlighted),
@@ -98,11 +122,7 @@ class ReflectionAnalyzer:
             return {
                 "area_for_improvement": "none",
                 "areas_mentioned": empty_areas,
-                "has_areas_for_improvement": False,
-                "has_praise": False,
-                "has_lesson_retelling": False,
-                "has_admin_notes": False,
-                "evidence": {
+                "quality_indicators": {
                     "specific_examples": False,
                     "next_steps": False,
                     "strengths_mentioned": False,
@@ -164,10 +184,6 @@ def process_reflection_analysis(input_file, output_file):
             'area_for_improvement': 'none',
             
             # Binary indicators (0/1)
-            'has_areas_for_improvement': 0,
-            'has_praise': 0,
-            'has_lesson_retelling': 0,
-            'has_admin_notes': 0,
             'specific_examples': 0,
             'next_steps': 0,
             'strengths_mentioned': 0,
@@ -205,19 +221,13 @@ def process_reflection_analysis(input_file, output_file):
                 if analysis_result:
                     # Update area_for_improvement
                     result_df.at[index, 'area_for_improvement'] = analysis_result.get('area_for_improvement', 'none')
-                    
-                    # Update binary indicators
-                    result_df.at[index, 'has_areas_for_improvement'] = int(analysis_result.get('has_areas_for_improvement', False))
-                    result_df.at[index, 'has_praise'] = int(analysis_result.get('has_praise', False))
-                    result_df.at[index, 'has_lesson_retelling'] = int(analysis_result.get('has_lesson_retelling', False))
-                    result_df.at[index, 'has_admin_notes'] = int(analysis_result.get('has_admin_notes', False))
 
-                    # Update evidence markers
-                    evidence = analysis_result.get('evidence', {})
-                    result_df.at[index, 'specific_examples'] = int(evidence.get('specific_examples', False))
-                    result_df.at[index, 'next_steps'] = int(evidence.get('next_steps', False))
-                    result_df.at[index, 'strengths_mentioned'] = int(evidence.get('strengths_mentioned', False))
-                    result_df.at[index, 'areas_for_growth'] = int(evidence.get('areas_for_growth', False))
+                    # Update quality markers
+                    quality_indicators = analysis_result.get('quality_indicators', {})
+                    result_df.at[index, 'specific_examples'] = int(quality_indicators.get('specific_examples', False))
+                    result_df.at[index, 'next_steps'] = int(quality_indicators.get('next_steps', False))
+                    result_df.at[index, 'strengths_mentioned'] = int(quality_indicators.get('strengths_mentioned', False))
+                    result_df.at[index, 'areas_for_growth'] = int(quality_indicators.get('areas_for_growth', False))
 
                     # Update area-specific indicators
                     areas_mentioned = analysis_result.get('areas_mentioned', {})
@@ -249,7 +259,7 @@ def process_reflection_analysis(input_file, output_file):
 def main():
     load_dotenv()  
     input_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/raw data/PST Data.xlsx"
-    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.03.04 - Reflections Analysis.csv"
+    output_file = r"C:/Users/yaj3ma/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/analysis/processed data/2025.03.06 - Reflections Analysis.csv"
     process_reflection_analysis(input_file, output_file)
 
 if __name__ == "__main__":
