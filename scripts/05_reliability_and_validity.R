@@ -41,7 +41,7 @@ gm <- tibble::tribble(
 #Load data
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
 
-#Reliability----
+#Validity----
 library(haven)
 qual_coding <- read_dta("C:/Users/Andre/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/data/qual coding/Refl_CTO_response_analysis_07082024.dta") %>%
   filter(!(nocriticism == 1 & (lessoncycle == 1 | lessonconnections == 1 | studentcomprehension == 1 | lessondelivery == 1 | praise == 1 | transitions == 1 | attention == 1 | nonverbaltechniques == 1 | corrections == 1)))
@@ -123,3 +123,53 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 
 # Save to LaTeX
 writeLines(table, "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables/Pred_LLM_w_Qual_no_se.tex")
+
+#Reliability----
+# Feedback
+feedback_1 <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) 
+feedback_2 <- read.csv(here("processed data", "2025.03.07 - Feedback Analysis.csv")) 
+
+feedback_1 <- feedback_1 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_1=value)
+feedback_2 <- feedback_2 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_2=value)
+
+merged_data <- left_join(feedback_1, feedback_2, by = c("observationid", "name")) %>%
+  mutate(agreement = ifelse(value_1==value_2, 1, 0))
+
+merged_data %>%
+  summarize(agreement_rate = mean(agreement)*100)
+
+# Feedback
+reflection_1 <- read.csv(here("processed data", "2025.03.06 - Reflections Analysis.csv")) 
+reflection_2 <- read.csv(here("processed data", "2025.03.09 - Reflections Analysis.csv")) 
+
+reflection_1 <- reflection_1 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_1=value)
+reflection_2 <- reflection_2 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_2=value)
+
+merged_data <- left_join(reflection_1, reflection_2, by = c("observationid", "name")) %>%
+  mutate(agreement = ifelse(value_1==value_2, 1, 0))
+
+merged_data %>%
+  summarize(agreement_rate = mean(agreement)*100)
+
+#Validity 2.0----
+# Take a random sample of 100 observations from feedback and reflections. Code them manually. Compare to ChatGPT codes.
+
+set.seed(939599)
+feedback_sample <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) %>% 
+  sample_n(size = 100) %>%
+  select(-area_for_improvement) %>%
+  mutate(across(-c(text, observationid), ~ NA))
+
+reflection_sample <- read.csv(here("processed data", "2025.03.06 - Reflections Analysis.csv")) %>% 
+  sample_n(size = 100) %>%
+  select(-area_for_improvement) %>%
+  mutate(across(-c(text, observationid), ~ NA))
+  
+# Export list
+openxlsx::write.xlsx(list("Feedback" = feedback_sample, "Reflection" = reflection_sample), 
+                     file = here("validity", "validity_coding.xlsx"), 
+                     overwrite = TRUE)
+
+# Upload
+
+# Check validity

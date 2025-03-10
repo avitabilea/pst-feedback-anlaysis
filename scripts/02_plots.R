@@ -335,7 +335,7 @@ ggsave(file.path(output_path, "AFI_Ref_when_no_AFI_Feedback.pdf"), width = 11, h
 analysis_data %>%
   group_by(supervisor_id) %>%
   summarize(
-    no_area_for_improvement = sum(afi_10_feed),
+    no_area_for_improvement = sum(no_afi_mentioned_feed),
     n = n()
   ) %>%
   ungroup() %>%
@@ -372,7 +372,7 @@ ggsave(file.path(output_path, "Supervisor pct no area for improvement.pdf"), wid
 analysis_data %>%
   group_by(supervisor_id, sup_blup_std) %>%
   summarize(
-    no_area_for_improvement = sum(afi_10_feed),
+    no_area_for_improvement = sum(no_afi_mentioned_feed),
     n_obs_sup = n(),
     prop_no_area_for_improvement = no_area_for_improvement / n_obs_sup,
     .groups = "drop"  # This removes the grouping after summarizing
