@@ -4,7 +4,7 @@
 
 #General----
 #Load packages
-pacman::p_load(conflicted, here, tidyverse, sandwich, lmtest, modelsummary, tinytable, car)
+pacman::p_load(conflicted, here, tidyverse, sandwich, lmtest, modelsummary, tinytable, car, gtheory, fixest)
 
 # Remove everything
 rm(list=ls())
@@ -38,17 +38,8 @@ gm <- tibble::tribble(
   "FE: observation_order", "Order FE", 0,
   "FE: cohort_cl", "Cohort FE", 0)
 
-# Renaming goodness-of-fit statistics (bivariate models)
-gm_bi <- tibble::tribble(
-  ~raw,                ~clean,          ~fmt,
-  "nobs",               "N",             0,
-  "r.squared",          "$R^2$",         3,
-  "FE: programcohort",  "Program $\\times$ cohort FE", 0,
-  "FE: supervisor_id",  "Supervisor FE", 0,
-  "FE: pst_id",  "PST FE", 0,
-  "FE: observation_order", "Order FE", 0,
-  "FE: cohort", "Cohort FE", 0,
-  "FE: st_school_id", "Placement School FE", 0)
+# Load a function that create both univariate and bivariate regression results
+source(here("scripts", "XX_univar_and_multivar_feols.R"))
 
 #Load data
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
@@ -238,25 +229,23 @@ writeLines(table, file.path(output_path, "Pred_feedback_5_demographics.tex"))
 #Predicting evaluation score----
 model1 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model2 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model3 <- feols(avg_eval_score_std ~ area_for_improvement_feed | supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model4 <- feols(avg_eval_score_std ~ area_for_improvement_feed | pst_id + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
+model3 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+model4 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
 
 # Create combined regression table
 models <- list(model1,model2,model3,model4)
 etable(models)
 
 cm <- c(
-  "area_for_improvement_feedClassroom Management" = "\\hspace{3mm} Classroom Management",
-  "area_for_improvement_feedNone" = "\\hspace{3mm} No Area",
-  "area_for_improvement_feedTie" = "\\hspace{3mm} Tie",
-  "area_for_improvement_feedStudent Engagement" = "\\hspace{3mm} Student Engagement",
-  "area_for_improvement_feedLesson Planning" = "\\hspace{3mm} Lesson Planning",
-  "area_for_improvement_feedCommunication" = "\\hspace{3mm} Communication",
-  "area_for_improvement_feedAssessment and Feedback" = "\\hspace{3mm} Assessment and Feedback",
-  "area_for_improvement_feedStudent Comprehension" = "\\hspace{3mm} Student Comprehension",
-  "area_for_improvement_feedDifferentiation" = "\\hspace{3mm} Differentiation",
-  "area_for_improvement_feedMultiple Areas" = "\\hspace{3mm} Multiple Areas",
-  "area_for_improvement_feedOther" = "\\hspace{3mm} Other Area"
+  "no_afi_mentioned_feed" = "\\hspace{3mm} No Area",
+  "classroom_management_mentioned_feed" = "\\hspace{3mm} Classroom Management",
+  "lesson_planning_mentioned_feed" = "\\hspace{3mm} Lesson Planning",
+  "student_engagement_mentioned_feed" = "\\hspace{3mm} Student Engagement",
+  "communication_mentioned_feed" = "\\hspace{3mm} Communication",
+  "assessment_feedback_mentioned_feed" = "\\hspace{3mm} Assessment and Feedback",
+  "student_comprehension_mentioned_feed" = "\\hspace{3mm} Student Comprehension",
+  "differentiation_mentioned_feed" = "\\hspace{3mm} Differentiation",
+  "other_mentioned_feed" = "\\hspace{3mm} Other Area"
 )
 
 # Function to format F-test results
@@ -273,24 +262,47 @@ format_ftest <- function(ftest_result) {
   data.frame(F = paste0(f_stat, stars))
 }
 
-# Hypotheses
-hypothesis_afi <- "area_for_improvement_feedClassroom Management = area_for_improvement_feedLesson Planning + area_for_improvement_feedStudent Engagement + area_for_improvement_feedCommunication + area_for_improvement_feedAssessment and Feedback + area_for_improvement_feedStudent Comprehension + area_for_improvement_feedDifferentiation + area_for_improvement_feedMultiple Areas + area_for_improvement_feedOther"
-hypothesis_afi_ref <- "0 = area_for_improvement_feedLesson Planning + area_for_improvement_feedStudent Engagement + area_for_improvement_feedCommunication + area_for_improvement_feedAssessment and Feedback + area_for_improvement_feedStudent Comprehension + area_for_improvement_feedDifferentiation + area_for_improvement_feedMultiple Areas + area_for_improvement_feedOther"
+# Create hypothesis matrix for testing equality of classroom_management coefficient with all others
+run_equality_test <- function(model) {
+  # Get coefficient names for mentioned_feed variables
+  coef_names <- names(coef(model))
+  feed_vars <- coef_names[grepl("_mentioned_feed$", coef_names)]
+  feed_vars <- feed_vars[feed_vars != "no_afi_mentioned_feed"] # Exclude no_afi if desired
+  
+  cm_var <- "classroom_management_mentioned_feed"
+  other_vars <- feed_vars[feed_vars != cm_var]
+  
+  # Create hypothesis matrix for testing: classroom_management = other_var_1 = other_var_2 = ... = other_var_n
+  # This requires (n-1) constraints where n is the number of variables
+  hyp_matrix <- matrix(0, nrow = length(other_vars), ncol = length(coef_names))
+  colnames(hyp_matrix) <- coef_names
+  
+  # For each row, compare classroom_management to one other variable
+  for (i in seq_along(other_vars)) {
+    hyp_matrix[i, cm_var] <- 1
+    hyp_matrix[i, other_vars[i]] <- -1
+  }
+  
+  # Run the F-test
+  ftest_result <- linearHypothesis(model, hyp_matrix, test = "F")
+  return(ftest_result)
+}
 
-# Run F-tests and format results
-ftest1 <- linearHypothesis(model1, hypothesis_afi, test = "F") %>% format_ftest()
-ftest2 <- linearHypothesis(model2, hypothesis_afi, test = "F") %>% format_ftest()
-ftest3 <- linearHypothesis(model3, hypothesis_afi_ref, test = "F") %>% format_ftest()
-ftest4 <- linearHypothesis(model4, hypothesis_afi_ref, test = "F") %>% format_ftest()
+# Run F-tests for each model
+ftest1 <- run_equality_test(model1) %>% format_ftest()
+ftest2 <- run_equality_test(model2) %>% format_ftest()
+ftest3 <- run_equality_test(model3) %>% format_ftest()
+ftest4 <- run_equality_test(model4) %>% format_ftest()
 
-ftest <- bind_cols(tibble("F-stat$\\dag$"),ftest1,ftest2,ftest3,ftest4)
-attr(ftest, 'position') <- c(24)
- 
+# Create the combined table row
+ftest <- bind_cols(tibble("F-stat$\\dag$"), ftest1, ftest2, ftest3, ftest4)
+attr(ftest, 'position') <- c(22)
+
+# Continue with table creation
 table <- modelsummary(models = models,
                       add_rows = ftest,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
-                      # vcov = "bootstrap", R = 1000, 
                       gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
                       gof_map = gm) %>%
   group_tt(i = list("\\textbf{Area for improvement}" = 1)) %>%
@@ -309,59 +321,34 @@ model3 <- feols(ever_enter_teaching ~ no_afi_mentioned_feed + classroom_manageme
 model4 <- feols(enter_teaching_imm ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model5 <- feols(same_school ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model6 <- feols(advantage_index ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model7 <- feols(examscore_std_ppr ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model8 <- feols(examscore_std_req ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model9 <- feols(ever_enter_teaching ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model10 <- feols(enter_teaching_imm ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model11 <- feols(same_school ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model12 <- feols(advantage_index ~ area_for_improvement_feed | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data,-area_for_improvement_feed),area_for_improvement_feed=area_for_improvement_ref), cluster = "pst_id", weights = ~inv_n_obs)
+model7 <- feols(examscore_std_ppr ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+model8 <- feols(examscore_std_req ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+model9 <- feols(ever_enter_teaching ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+model10 <- feols(enter_teaching_imm ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+model11 <- feols(same_school ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+model12 <- feols(advantage_index ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
 
 # Create combined regression table
 models <- list(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10,model11,model12)
 etable(models)
 
 cm <- c(
-  "area_for_improvement_feedClassroom Management" = "\\hspace{3mm} Classroom Management",
-  "area_for_improvement_feedNone" = "\\hspace{3mm} No Area",
-  "area_for_improvement_feedTie" = "\\hspace{3mm} Tie",
-  "area_for_improvement_feedStudent Engagement" = "\\hspace{3mm} Student Engagement",
-  "area_for_improvement_feedLesson Planning" = "\\hspace{3mm} Lesson Planning",
-  "area_for_improvement_feedCommunication" = "\\hspace{3mm} Communication",
-  "area_for_improvement_feedAssessment and Feedback" = "\\hspace{3mm} Assessment and Feedback",
-  "area_for_improvement_feedStudent Comprehension" = "\\hspace{3mm} Student Comprehension",
-  "area_for_improvement_feedDifferentiation" = "\\hspace{3mm} Differentiation",
-  "area_for_improvement_feedMultiple Areas" = "\\hspace{3mm} Multiple Areas",
-  "area_for_improvement_feedOther" = "\\hspace{3mm} Other Area"
+  "no_afi_mentioned_feed" = "\\hspace{3mm} No Area",
+  "classroom_management_mentioned_feed" = "\\hspace{3mm} Classroom Management",
+  "lesson_planning_mentioned_feed" = "\\hspace{3mm} Lesson Planning",
+  "student_engagement_mentioned_feed" = "\\hspace{3mm} Student Engagement",
+  "communication_mentioned_feed" = "\\hspace{3mm} Communication",
+  "assessment_feedback_mentioned_feed" = "\\hspace{3mm} Assessment and Feedback",
+  "student_comprehension_mentioned_feed" = "\\hspace{3mm} Student Comprehension",
+  "differentiation_mentioned_feed" = "\\hspace{3mm} Differentiation",
+  "other_mentioned_feed" = "\\hspace{3mm} Other Area"
 )
-
-# Classroom management binary
-model1 <- feols(examscore_std_ppr ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model2 <- feols(examscore_std_req ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model3 <- feols(ever_enter_teaching ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model4 <- feols(enter_teaching_imm ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model5 <- feols(same_school ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model6 <- feols(advantage_index ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model7 <- feols(examscore_std_ppr ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data, -afi_1_feed), afi_1_feed=afi_1_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model8 <- feols(examscore_std_req ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data, -afi_1_feed), afi_1_feed=afi_1_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model9 <- feols(ever_enter_teaching ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data, -afi_1_feed), afi_1_feed=afi_1_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model10 <- feols(enter_teaching_imm ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data, -afi_1_feed), afi_1_feed=afi_1_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model11 <- feols(same_school ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data, -afi_1_feed), afi_1_feed=afi_1_ref), cluster = "pst_id", weights = ~inv_n_obs)
-model12 <- feols(advantage_index ~ afi_1_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename(select(analysis_data, -afi_1_feed), afi_1_feed=afi_1_ref), cluster = "pst_id", weights = ~inv_n_obs)
-
-cm_binary <- modelsummary(models = list(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10,model11,model12), 
-                          stars = c('*' = .05, '**' = .01, '***' = .001),
-                          gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors|R2|FE|N|Mean.DV',
-                          output = "data.frame") %>%
-  mutate(term=ifelse(row_number()!=1, "", "\\midrule Classroom Management (0/1)$\\dag$")) %>%
-  select(-part,-statistic)
-attr(cm_binary, 'position') <- c(21, 22)
 
 table <- modelsummary(models = models,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
                       gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
-                      gof_map = gm,
-                      add_rows = cm_binary) %>%
+                      gof_map = gm) %>%
   group_tt(i = list("\\textbf{Area for improvement}" = 1)) %>%
   save_tt("latex")
 
@@ -371,22 +358,27 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 writeLines(table, file.path(output_path, "Pred_Outcomes.tex"))
 
 #Variance Decomposition----
-formula_rate <- avg_eval_score_std ~  (1|observation_order) + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order)
-formula_len_feed <- n_sentences_feed ~  (1|observation_order) + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order) 
-formula_afi_feed <- areas_for_growth_feed ~  (1|observation_order) + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order) 
-formula_len_ref <- n_sentences_ref ~  (1|observation_order) + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order)
+formula_rate <- avg_eval_score_std ~  observation_order + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order)
+formula_len_feed <- n_sentences_feed ~  observation_order + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order) 
+formula_str_feed <- strengths_mentioned_feed ~  observation_order + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order) 
+formula_exp_feed <- specific_examples_feed ~  observation_order + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order) 
+formula_afi_feed <- areas_for_growth_feed ~  observation_order + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order) 
+formula_nxt_feed <- next_steps_feed ~  observation_order + (1|certification) + (1|pst_id) + (1|st_school_id) + (1|st_school_id:observation_order) + (1|st_school_id:supervisor_id) + (1|supervisor_id) + (1|supervisor_id:observation_order) + (1|st_school_id:supervisor_id:observation_order)
 
 # Estimate models using gstudy function
 gstudy_rate <- gstudy(data = analysis_data, formula = formula_rate, control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb'))) %>% pluck("components") %>% dplyr::select(source, `Observation Score` = percent)
 gstudy_len_feed <- gstudy(data = analysis_data, formula = formula_len_feed, control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb'))) %>% pluck("components") %>% dplyr::select(source, `# Sentences Feedback` = percent)
+gstudy_str_feed <- gstudy(data = analysis_data, formula = formula_str_feed, control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb'))) %>% pluck("components") %>% dplyr::select(source, `Feedback Has Strength` = percent)
+gstudy_exp_feed <- gstudy(data = analysis_data, formula = formula_exp_feed, control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb'))) %>% pluck("components") %>% dplyr::select(source, `Feedback Has Examples` = percent)
 gstudy_afi_feed <- gstudy(data = analysis_data, formula = formula_afi_feed, control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb'))) %>% pluck("components") %>% dplyr::select(source, `Feedback Has Area for Improvement` = percent)
-gstudy_len_ref <- gstudy(data = analysis_data, formula = formula_len_ref, control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb'))) %>% pluck("components") %>% dplyr::select(source, `# Sentences Reflection` = percent)
+gstudy_nxt_feed <- gstudy(data = analysis_data, formula = formula_nxt_feed, control = lmerControl(optimizer ='optimx', optCtrl=list(method='nlminb'))) %>% pluck("components") %>% dplyr::select(source, `Feedback Has Next Steps` = percent)
 
 # Make results a table
 table <- left_join(gstudy_rate, gstudy_len_feed) %>%
+  left_join(gstudy_str_feed) %>%
+  left_join(gstudy_exp_feed) %>%
   left_join(gstudy_afi_feed) %>%
-  left_join(gstudy_len_ref) %>%
-  # left_join(gstudy_afi_ref) %>%
+  left_join(gstudy_nxt_feed) %>%
   mutate(Variable = case_when(source == "observation_order" ~ "Order",
                               source == "pst_id" ~ "Preservice Teacher",
                               source == "st_school_id" ~ "Placement School",
@@ -399,7 +391,7 @@ table <- left_join(gstudy_rate, gstudy_len_feed) %>%
                               source == "n_sentences_feed" ~ "Feedback Sentences",
                               source == "areas_for_growth_feed" ~ "Feedback Area for Improvement",
                               source == "Residual" ~ "Residual")) %>%
-  dplyr::select(Variable, `Observation Score`, `# Sentences Feedback`, `Feedback Has Area for Improvement`, `# Sentences Reflection`) %>%
+  # dplyr::select(Variable, `Observation Score`, `# Sentences Feedback`, `Feedback Has Area for Improvement`, `# Sentences Reflection`) %>%
   tinytable::tt() %>%
   save_tt("latex")
 
@@ -408,28 +400,79 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 # Save to LaTeX
 writeLines(table, file.path(output_path, "Variance Decomposition.tex"))
 
-# Relationship between feedback and reflections----
-model1 <- feglm(strengths_mentioned_ref ~ strengths_mentioned_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model2 <- feglm(strengths_mentioned_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model3 <- feglm(specific_examples_ref ~ specific_examples_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model4 <- feglm(specific_examples_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model5 <- feglm(areas_for_growth_ref ~ areas_for_growth_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model6 <- feglm(areas_for_growth_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model7 <- feglm(next_steps_ref ~ next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-model8 <- feglm(next_steps_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id", family = binomial(link = "logit"))
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8)
+# Relationship between feedback and reflection quality indicators----
+model1 <- fit_clustered_model(strengths_mentioned_ref ~ strengths_mentioned_feed, data=analysis_data, cluster = "pst_id")
+model2 <- fit_clustered_model(strengths_mentioned_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id")
+model3 <- fit_clustered_model(specific_examples_ref ~ specific_examples_feed, data=analysis_data, cluster = "pst_id")
+model4 <- fit_clustered_model(specific_examples_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id")
+model5 <- fit_clustered_model(areas_for_growth_ref ~ areas_for_growth_feed, data=analysis_data, cluster = "pst_id")
+model6 <- fit_clustered_model(areas_for_growth_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id")
+model7 <- fit_clustered_model(next_steps_ref ~ next_steps_feed, data=analysis_data, cluster = "pst_id")
+model8 <- fit_clustered_model(next_steps_ref ~ strengths_mentioned_feed + specific_examples_feed + areas_for_growth_feed + next_steps_feed, data=analysis_data, cluster = "pst_id")
+
+# Extract the model objects for modelsummary
+models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
+
+# Create a list of vcov matrices for modelsummary
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
 
 cm <- c("strengths_mentioned_feed" = "\\hspace{3mm} PST Strengths",
         "specific_examples_feed" = "\\hspace{3mm} Specific Examples",
         "areas_for_growth_feed" = "\\hspace{3mm} Area for Improvement",
         "next_steps_feed" = "\\hspace{3mm} Actionable Steps")
-table <- modelsummary(models = models,
-                      exponentiate = T,
+
+table <- modelsummary(models = models, 
+                      vcov = vcov_list,
+                      exponentiate = TRUE,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
                       coef_map = cm,
-                      gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
+                      gof_omit = '.',
                       gof_map = gm) %>%
   group_tt(i = list("\\textbf{Supervisor Feedback}" = 1)) %>%
   save_tt("latex")
+
 table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE) %>% replace_x_with_checkmark()
 writeLines(table, file.path(output_path, "Predicting_Ref_w_Feedback.tex"))
+
+# Relationship between feedback quality indicators and reflection length----
+model1 <- bi_and_muti_variate_feols(
+  dependent_var = "log(n_sentences_ref)",
+  independent_vars = c("strengths_mentioned_feed", "specific_examples_feed", "areas_for_growth_feed", "next_steps_feed"),
+  data = analysis_data,
+  fixed_effects = c("pst_id"),
+  cluster_var = "pst_id"
+)
+
+model2 <- bi_and_muti_variate_feols(
+  dependent_var = "log(n_sentences_ref)",
+  independent_vars = c("strengths_mentioned_feed + log(n_sentences_feed)", "specific_examples_feed + log(n_sentences_feed)", "areas_for_growth_feed + log(n_sentences_feed)", "next_steps_feed + log(n_sentences_feed)"),
+  data = analysis_data,
+  fixed_effects = c("pst_id"),
+  cluster_var = "pst_id"
+)
+
+combined_table <- left_join(model1$table, rename(model2$table, univariate_results_2=univariate_results, multivariate_results_2 = multivariate_results)) %>%
+  mutate(term = case_when(statistic == "std.error" ~ "",
+                          term == "strengths_mentioned_feed" ~ "PST Strengths",
+                          term == "specific_examples_feed" ~ "Specific Examples",
+                          term == "areas_for_growth_feed" ~ "Areas for Improvement",
+                          term == "next_steps_feed" ~ "Next Steps")) %>%
+  select(-part, -statistic)
+
+# Split the combined_table into chunks of two rows each
+split_tables <- split(combined_table, ceiling(seq_along(1:nrow(combined_table))/2))
+
+# Iterate over each chunk and create LaTeX tables
+for (i in seq_along(split_tables)) {
+  table_chunk <- tt(split_tables[[i]]) %>%
+    save_tt("latex")
+  
+  # Clean the LaTeX table by extracting the relevant part
+  table_chunk <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table_chunk, perl = TRUE) %>% replace_x_with_checkmark()
+  
+  # Define the file name for each chunk (e.g., Pred_Ref_AFR_w_Feed_AFR_part1.tex)
+  file_name <- paste0(output_path, "/Predicting_Ref_Length_w_Feedback_", i, ".tex")
+  
+  # Save the LaTeX table
+  writeLines(table_chunk, file_name)
+}

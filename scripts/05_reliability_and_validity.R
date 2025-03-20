@@ -38,6 +38,44 @@ gm <- tibble::tribble(
   "FE: observation_order", "Order FE", 0,
   "FE: cohort_cl", "Cohort FE", 0)
 
+# Define a function to fit clustered models
+fit_clustered_model <- function(formula, data, cluster_var = NULL) {
+  # Convert the formula to a character string to analyze it
+  formula_str <- as.character(formula)
+  
+  # Determine the dependent variable name
+  dep_var <- formula_str[2]
+  
+  # Count the number of coefficients by creating a model matrix
+  model_matrix <- model.matrix(formula, data)
+  n_coefs <- ncol(model_matrix)
+  
+  # Fit the model using glm with log link and appropriate starting values
+  model <- try(glm(
+    formula, 
+    data = data, 
+    family = binomial(link = "log"),
+    start = c(log(mean(data[[dep_var]])), rep(0, n_coefs - 1))
+  ), silent = TRUE)
+  
+  # Apply appropriate variance-covariance estimation
+  if (!is.null(cluster_var)) {
+    # Use clustered standard errors if cluster variable is provided
+    robust_vcov <- vcovCL(model, cluster = data[[cluster_var]])
+  } else {
+    # Default to heteroskedasticity-robust standard errors if no cluster variable
+    robust_vcov <- vcovHC(model, type = "HC1")
+  }
+  
+  # Return model with appropriate variance-covariance matrix
+  robust_model <- list(
+    model = model,
+    vcov = robust_vcov
+  )
+  
+  return(robust_model)
+}
+
 #Load data
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
 
@@ -55,22 +93,24 @@ qual_coding_lim <- select(qual_coding, observationid, crm, Codes1,
 matched_data <- inner_join(analysis_data, qual_coding_lim) 
 
 #Regressions----
-model1 <- feglm(classroom_management_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model2 <- feglm(lesson_planning_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model3 <- feglm(student_engagement_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model4 <- feglm(communication_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model5 <- feglm(assessment_feedback_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model6 <- feglm(student_comprehension_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model7 <- feglm(differentiation_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model8 <- feglm(other_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
-model9 <- feglm(no_afi_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data, vcov = "hetero", family = binomial(link = "logit"))
+model1 <- fit_clustered_model(classroom_management_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model2 <- fit_clustered_model(lesson_planning_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model3 <- fit_clustered_model(student_engagement_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model4 <- fit_clustered_model(communication_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model5 <- fit_clustered_model(assessment_feedback_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model6 <- fit_clustered_model(student_comprehension_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model7 <- fit_clustered_model(differentiation_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model8 <- fit_clustered_model(other_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
+model9 <- fit_clustered_model(no_afi_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
 
-models <- list(model1, model2, model3, model4, model5, model6, model7, model8, model9)
-etable(models)
+# Extract the model objects for modelsummary
+models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model, model9$model)
+
+# Create a list of vcov matrices for modelsummary
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov, model9$vcov)
 
 # Renaming coefficients
 cm <- c(
-  "nocriticism" = "\\hspace{1mm} No criticism",
   "praise" = "\\hspace{3mm} Praise",
   "transitions" = "\\hspace{3mm} Transitions",
   "attention" = "\\hspace{3mm} Attention",
@@ -79,17 +119,19 @@ cm <- c(
   "lessoncycle" = "\\hspace{3mm} Lesson Cycle",
   "lessonconnections" = "\\hspace{3mm} Lesson Connections",
   "studentcomprehension" = "\\hspace{3mm} Student Comprehension",
-  "lessondelivery" = "\\hspace{3mm} Lesson Delivery"
+  "lessondelivery" = "\\hspace{3mm} Lesson Delivery",
+  "nocriticism" = "\\hspace{1mm} No criticism"
 )
 
 # Use model summary to create a nice table
 table <- modelsummary(models = models,
                       stars = c('*' = .05, '**' = .01, '***' = .001),
+                      vcov = vcov_list,
                       coef_map = cm,
                       exponentiate = T,
                       gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
                       gof_map = gm) %>%
-  group_tt(i = list("\\textbf{Monitoring Student Behavior}" = 3, "\\textbf{Instructional Development}" = 13)) %>%
+  group_tt(i = list("\\textbf{Monitoring Student Behavior}" = 1, "\\textbf{Instructional Development}" = 10)) %>%
   save_tt("latex")
 
 table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE)
@@ -132,10 +174,12 @@ feedback_2 <- read.csv(here("processed data", "2025.03.07 - Feedback Analysis.cs
 feedback_1 <- feedback_1 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_1=value)
 feedback_2 <- feedback_2 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_2=value)
 
-merged_data <- left_join(feedback_1, feedback_2, by = c("observationid", "name")) %>%
-  mutate(agreement = ifelse(value_1==value_2, 1, 0))
+merged_data_feed <- left_join(feedback_1, feedback_2, by = c("observationid", "name")) %>%
+  mutate(agreement = ifelse(value_1==value_2, 1, 0)) %>%
+  mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"))
 
-merged_data %>%
+agreement_feed <- merged_data_feed %>%
+  group_by(task) %>%
   summarize(agreement_rate = mean(agreement)*100)
 
 # Feedback
@@ -145,11 +189,25 @@ reflection_2 <- read.csv(here("processed data", "2025.03.09 - Reflections Analys
 reflection_1 <- reflection_1 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_1=value)
 reflection_2 <- reflection_2 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_2=value)
 
-merged_data <- left_join(reflection_1, reflection_2, by = c("observationid", "name")) %>%
-  mutate(agreement = ifelse(value_1==value_2, 1, 0))
+merged_data_ref <- left_join(reflection_1, reflection_2, by = c("observationid", "name")) %>%
+  mutate(agreement = ifelse(value_1==value_2, 1, 0)) %>%
+  mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"))
 
-merged_data %>%
-  summarize(agreement_rate = mean(agreement)*100)
+agreement_ref <- merged_data_ref %>%
+  group_by(task) %>%
+  summarize(agreement_rate = mean(agreement)*100) %>%
+  select(-task)
+
+table <- bind_cols(agreement_feed, agreement_ref) %>%
+  # mutate(name = "Agreement rate (\\%)") %>%
+  mutate(across(where(is.numeric), ~round(.x, 1))) %>%
+  # relocate(name, task) %>%
+  tt() %>%
+  save_tt(output="latex")
+
+table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE)
+
+writeLines(table, file.path(output_path, "Agreement_Rates.tex"))
 
 #Validity 2.0----
 # Take a random sample of 100 observations from feedback and reflections. Code them manually. Compare to ChatGPT codes.
