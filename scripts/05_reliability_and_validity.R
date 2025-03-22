@@ -179,7 +179,7 @@ merged_data_feed <- left_join(feedback_1, feedback_2, by = c("observationid", "n
   mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"))
 
 agreement_feed <- merged_data_feed %>%
-  group_by(task) %>%
+  group_by(task, name) %>%
   summarize(agreement_rate = mean(agreement)*100)
 
 # Feedback
@@ -194,7 +194,7 @@ merged_data_ref <- left_join(reflection_1, reflection_2, by = c("observationid",
   mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"))
 
 agreement_ref <- merged_data_ref %>%
-  group_by(task) %>%
+  group_by(task, name) %>%
   summarize(agreement_rate = mean(agreement)*100) %>%
   select(-task)
 
@@ -229,5 +229,21 @@ openxlsx::write.xlsx(list("Feedback" = feedback_sample, "Reflection" = reflectio
                      overwrite = TRUE)
 
 # Upload
+manual_coding <- openxlsx::read.xlsx(here("validity", "validity_coding - KV.xlsx"), sheet = "Feedback", startRow = 2) %>%
+  rename(observationid=X1) %>%
+  select(-X2) %>%
+  pivot_longer(cols = -observationid, values_to = "chatgpt_code") 
+
+feedback_sample_nonmissing <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) %>% 
+  select(-c(area_for_improvement, text)) %>%
+  pivot_longer(cols = -observationid, values_to = "manual_code") 
+
+validity_data <- feedback_sample_nonmissing %>%
+  inner_join(manual_coding, by = c("observationid", "name")) %>%
+  mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"),
+         agree = ifelse(chatgpt_code==manual_code, 1, 0)) 
 
 # Check validity
+validity_data %>%
+  group_by(name) %>%
+  summarize(agreement_rate = mean(agree))
