@@ -17,7 +17,7 @@ font_add(family = "LMRoman", regular = here("lmroman10-regular.otf"))
 showtext_auto()
 
 # Set output filepath - YOU'LL NEED TO UPDATE THIS 
-output_path <- "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
+output_path <- "C:/Users/yaj3ma/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
 
 #Load data
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
@@ -47,19 +47,22 @@ ggplot(analysis_data, aes(x=n_sentences_ref)) +
   geom_vline(xintercept = median(analysis_data$n_sentences_ref, na.rm=T), linetype = "dashed", color = "black")
 ggsave(file.path(output_path, "Sentences Per Reflection Hist.pdf"), width = 6, height = 4)
 
-#Plot feedback descriptions----
+#Observation-level descriptions----
 plot_data <- analysis_data %>%
-  mutate(feedback_score = rowMeans(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed")), na.rm = TRUE))
+  mutate(feedback_score = rowMeans(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed",
+                                            "specific_examples_ref", "next_steps_ref", "strengths_mentioned_ref", "areas_for_growth_ref")), na.rm = TRUE))
 
 # Calculate overall means
 overall_means <- plot_data %>%
-  summarize(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed"),
+  summarize(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed",
+                     "specific_examples_ref", "next_steps_ref", "strengths_mentioned_ref", "areas_for_growth_ref"),
                    ~mean(.x, na.rm = TRUE), .names = "overall_{.col}"))
 
 # Calculate PST-level means (PSTs with at least one occurrence)
 pst_means <- plot_data %>%
   group_by(pst_id) %>%
-  summarize(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed"),
+  summarize(across(c("specific_examples_feed", "next_steps_feed", "strengths_mentioned_feed", "areas_for_growth_feed",
+                     "specific_examples_ref", "next_steps_ref", "strengths_mentioned_ref", "areas_for_growth_ref"),
                    ~as.numeric(any(.x == 1, na.rm = TRUE)))) %>%
   summarize(across(-pst_id, ~mean(.x, na.rm = TRUE), .names = "pst_{.col}"))
 
@@ -69,31 +72,59 @@ plot_data_combined <- bind_rows(
                cols = everything(), 
                names_to = "Category", 
                values_to = "Mean") %>%
-    mutate(Type = "All Feedback"),
+    mutate(Type = "Observation-Level"),
   pivot_longer(pst_means, 
                cols = everything(), 
                names_to = "Category", 
                values_to = "Mean") %>%
-    mutate(Type = "PSTs")
+    mutate(Type = "PST-Level")
 ) %>%
   mutate(
     Category = str_remove(Category, "^(overall_|pst_)"),
     Category = str_replace_all(Category, "_", " ") %>% str_to_title()
   ) %>%
-  mutate(Category = case_when(Category=="Strengths Mentioned Feed" ~ "PST Strengths",
-                              Category=="Specific Examples Feed" ~ "Specific Examples",
-                              Category=="Areas For Growth Feed" ~ "Area for Improvement",
-                              Category=="Next Steps Feed" ~ "Actionable Steps"),
+  mutate(document = ifelse(grepl("Feed", Category), "Supervisor Feedback", "PST Reflections"),
+         Category = str_remove(str_remove(Category, " Feed"), " Ref"),
+         Category = case_when(Category=="Strengths Mentioned" ~ "PST Strengths",
+                              Category=="Specific Examples" ~ "Specific Examples",
+                              Category=="Areas For Growth" ~ "Area for Improvement",
+                              Category=="Next Steps" ~ "Actionable Steps"),
          Category = factor(Category, levels = c("Actionable Steps", "Area for Improvement", "Specific Examples", "PST Strengths")))
 
 # Create bar plot
-ggplot(plot_data_combined, aes(x = reorder(Category, Mean), y = Mean, fill = Type)) +
+plot_data_combined %>%
+  filter(Type == "Observation-Level") %>%
+  ggplot(aes(x = reorder(Category, Mean), y = Mean, fill = document)) +
   geom_col(position = "dodge", width = 0.7) +
   coord_flip() +
-  labs(x = NULL, y = "% of Feedback or PSTs", fill = NULL) +
+  labs(x = NULL, y = "% of Observations", fill = NULL) +
   theme_minimal(base_size = 14) +
   scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
-  scale_fill_manual(values = c("All Feedback" = "#FF8C42", "PSTs" = "#1F4E79")) +
+  scale_fill_manual(values = c("Supervisor Feedback" = "#FF8C42", "PST Reflections" = "#1F4E79")) +
+  theme(
+    text = element_text(family = "LMRoman", color = "black", size = 16),
+    plot.caption = element_text(hjust = 0),
+    axis.text = element_text(color = "black", size = 16),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
+  ) +
+  scale_x_discrete(
+    limits = c("Actionable Steps", "Area for Improvement", "Specific Examples", "PST Strengths")
+  )
+ggsave(file.path(output_path, "Observation-Level Bar Chart.pdf"), width = 6, height = 4)
+
+#PST-level descriptions----
+# Create bar plot
+plot_data_combined %>%
+  filter(Type == "PST-Level") %>%
+  ggplot(aes(x = reorder(Category, Mean), y = Mean, fill = document)) +
+  geom_col(position = "dodge", width = 0.7) +
+  coord_flip() +
+  labs(x = NULL, y = "% of PSTs", fill = NULL) +
+  theme_minimal(base_size = 14) +
+  scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
+  scale_fill_manual(values = c("Supervisor Feedback" = "#FF8C42", "PST Reflections" = "#1F4E79")) +
   theme(
     text = element_text(family = "LMRoman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
@@ -106,68 +137,7 @@ ggplot(plot_data_combined, aes(x = reorder(Category, Mean), y = Mean, fill = Typ
     limits = c("Actionable Steps", "Area for Improvement", "Specific Examples", "PST Strengths")
   )
 rm(plot_data_combined, overall_means, pst_means)
-ggsave(file.path(output_path, "Feedback Bar Chart.pdf"), width = 6, height = 4)
-
-#Plot reflection descriptions----
-plot_data <- analysis_data %>%
-  mutate(feedback_score = rowMeans(across(c("specific_examples_ref", "next_steps_ref", "strengths_mentioned_ref", "areas_for_growth_ref")), na.rm = TRUE))
-
-# Calculate overall means
-overall_means <- plot_data %>%
-  summarize(across(c("specific_examples_ref", "next_steps_ref", "strengths_mentioned_ref", "areas_for_growth_ref"),
-                   ~mean(.x, na.rm = TRUE), .names = "overall_{.col}"))
-
-# Calculate PST-level means (PSTs with at least one occurrence)
-pst_means <- plot_data %>%
-  group_by(pst_id) %>%
-  summarize(across(c("specific_examples_ref", "next_steps_ref", "strengths_mentioned_ref", "areas_for_growth_ref"),
-                   ~as.numeric(any(.x == 1, na.rm = TRUE)))) %>%
-  summarize(across(-pst_id, ~mean(.x, na.rm = TRUE), .names = "pst_{.col}"))
-
-# Combine and reshape data for plotting
-plot_data_combined <- bind_rows(
-  pivot_longer(overall_means, 
-               cols = everything(), 
-               names_to = "Category", 
-               values_to = "Mean") %>%
-    mutate(Type = "All Reflections"),
-  pivot_longer(pst_means, 
-               cols = everything(), 
-               names_to = "Category", 
-               values_to = "Mean") %>%
-    mutate(Type = "PSTs")
-) %>%
-  mutate(
-    Category = str_remove(Category, "^(overall_|pst_)"),
-    Category = str_replace_all(Category, "_", " ") %>% str_to_title()
-  ) %>%
-  mutate(Category = case_when(Category=="Strengths Mentioned Ref" ~ "PST Strengths",
-                              Category=="Specific Examples Ref" ~ "Specific Examples",
-                              Category=="Areas For Growth Ref" ~ "Area for Improvement",
-                              Category=="Next Steps Ref" ~ "Actionable Steps"),
-         Category = factor(Category, levels = c("Actionable Steps", "Area for Improvement", "Specific Examples", "PST Strengths")))
-
-# Create bar plot
-ggplot(plot_data_combined, aes(x = reorder(Category, Mean), y = Mean, fill = Type)) +
-  geom_col(position = "dodge", width = 0.7) +
-  coord_flip() +
-  labs(x = NULL, y = "% of Reflections or PSTs", fill = NULL) +
-  theme_minimal(base_size = 14) +
-  scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
-  scale_fill_manual(values = c("All Reflections" = "#FF8C42", "PSTs" = "#1F4E79")) +
-  theme(
-    text = element_text(family = "LMRoman", color = "black", size = 16),
-    plot.caption = element_text(hjust = 0),
-    axis.text = element_text(color = "black", size = 16),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor = element_blank(),
-    legend.position = "bottom"
-  ) +
-  scale_x_discrete(
-    limits = c("Actionable Steps", "Area for Improvement", "Specific Examples", "PST Strengths")
-  )
-rm(plot_data_combined, overall_means, pst_means)
-ggsave(file.path(output_path, "Reflections Bar Chart.pdf"), width = 6, height = 4)
+ggsave(file.path(output_path, "PST-Level Bar Chart.pdf"), width = 6, height = 4)
 
 #Plot area for improvement----
 plot_data <- analysis_data %>%
@@ -194,14 +164,14 @@ plot_data_combined <- bind_rows(
                cols = everything(), 
                names_to = "Category", 
                values_to = "Mean") %>%
-    mutate(Type = "Feedback Level"),
+    mutate(Type = "Observation-Level"),
   pivot_longer(pst_means, 
                cols = everything(), 
                names_to = "Category", 
                values_to = "Mean") %>%
-    mutate(Type = "PST Level")
+    mutate(Type = "PST-Level")
 ) %>%
-  mutate(reflection = grepl("_ref", Category)) %>%
+  mutate(reflection = ifelse(grepl("_ref", Category), "PST Reflections", "Supervisor Feedback")) %>%
   mutate(
     Category = str_remove(Category, "^(overall_|pst_)"),
     Category = str_replace_all(Category, "_", " ") %>% str_to_title()
@@ -214,14 +184,14 @@ plot_data_combined <- bind_rows(
 
 # Create bar plot - feedback
 plot_data_combined %>%
-  filter(reflection == F) %>%
-  ggplot(aes(x = reorder(Category, Mean), y = Mean, fill = Type)) +
+  filter(Type == "Observation-Level") %>%
+  ggplot(aes(x = reorder(Category, Mean), y = Mean, fill = reflection)) +
   geom_col(position = "dodge", width = 0.7) +
   coord_flip() +
-  labs(x = NULL, y = "% of Feedback or PSTs", fill = NULL) +
+  labs(x = NULL, y = "% of Observations", fill = NULL) +
   theme_minimal(base_size = 14) +
-  scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
-  scale_fill_manual(values = c("Feedback Level" = "#FF8C42", "PST Level" = "#1F4E79")) +
+  scale_y_continuous(expand = c(0,0), limits = c(0, 0.75), labels = scales::percent_format()) +
+  scale_fill_manual(values = c("Supervisor Feedback" = "#FF8C42", "PST Reflections" = "#1F4E79")) +
   theme(
     text = element_text(family = "LMRoman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
@@ -230,28 +200,7 @@ plot_data_combined %>%
     panel.grid.minor = element_blank(),
     legend.position = "bottom"
   )
-ggsave(file.path(output_path, "Bar Chart Area for Improvement - Feedback.pdf"), width = 7, height = 4)
-
-# Create bar plot - reflections
-plot_data_combined %>%
-  filter(reflection == T) %>%
-  ggplot(aes(x = reorder(Category, Mean), y = Mean, fill = Type)) +
-  geom_col(position = "dodge", width = 0.7) +
-  coord_flip() +
-  labs(x = NULL, y = "% of Reflections or PSTs", fill = NULL) +
-  theme_minimal(base_size = 14) +
-  scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
-  scale_fill_manual(values = c("Feedback Level" = "#FF8C42", "PST Level" = "#1F4E79")) +
-  theme(
-    text = element_text(family = "LMRoman", color = "black", size = 16),
-    plot.caption = element_text(hjust = 0),
-    axis.text = element_text(color = "black", size = 16),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor = element_blank(),
-    legend.position = "bottom"
-  )
-rm(plot_data_combined, overall_means, pst_means)
-ggsave(file.path(output_path, "Bar Chart Area for Improvement - Reflections.pdf"), width = 7, height = 4)
+ggsave(file.path(output_path, "Bar Chart Area for Improvement - Observation.pdf"), width = 7, height = 4)
 
 # What do PSTs mention when supervisors suggest other, nothing, or multiple areas for improvement?----
 # Calculate share_same
@@ -347,7 +296,8 @@ final_result %>%
 ggsave(file.path(output_path, "AFI_Ref_when_no_AFI_Feedback.pdf"), width = 11, height = 7.5)
 
 #Share of times supervisors provide no feedback----
-analysis_data %>%
+# Prepare data and keep plotting order
+plot_data <- analysis_data %>%
   group_by(supervisor_id) %>%
   summarize(
     no_area_for_improvement = sum(no_afi_mentioned_feed),
@@ -355,11 +305,42 @@ analysis_data %>%
   ) %>%
   ungroup() %>%
   mutate(
-    sup_share_no_area = no_area_for_improvement / n,
-    supervisor_id = factor(supervisor_id, levels = supervisor_id[order(-sup_share_no_area)])
+    sup_share_no_area = no_area_for_improvement / n
   ) %>%
-  ggplot(aes(x = supervisor_id, y = sup_share_no_area)) +
+  arrange(desc(sup_share_no_area)) %>%
+  mutate(
+    supervisor_id = factor(supervisor_id, levels = supervisor_id)
+  )
+
+# Bar count and quartile positions
+n_bars <- nrow(plot_data)
+quartile_positions <- quantile(1:n_bars, probs = c(0.25, 0.5, 0.75), names = FALSE)
+quartile_labels <- c("75th percentile", "50th percentile", "25th percentile")
+
+# Plot
+ggplot(plot_data, aes(x = supervisor_id, y = sup_share_no_area)) +
   geom_bar(stat = "identity", position = "dodge", fill = "#FF8C42", width = 0.5) +
+  
+  # Dashed lines at quartiles
+  geom_vline(
+    xintercept = quartile_positions,
+    linetype = "dashed",
+    color = "black"
+  ) +
+  
+  # Adjust text labels position slightly upwards
+  annotate(
+    "text",
+    x = quartile_positions+3,
+    y = 0.96,  # slightly moved up from 1.02
+    label = quartile_labels,
+    angle = 0,  # horizontal text
+    hjust = 0.5,  # center horizontally
+    size = 6,
+    family = "LMRoman"
+  ) +
+  
+  coord_flip() +
   theme_minimal() +
   labs(
     y = "% of Feedback with No Area for Improvement",
@@ -367,19 +348,24 @@ analysis_data %>%
   ) +
   scale_y_continuous(
     expand = c(0, 0.01),
-    breaks = seq(0.0, 1, by = 0.25),
-    limits = c(0.0, 1),
+    breaks = c(0,0.25, 0.5, 0.75, 1),  # setting major breaks at .25, .5, .75, and 1
+    limits = c(0.0, 1.02),
     labels = scales::percent_format()
   ) +
   theme(
-    panel.grid.major.x = element_blank(),
+    # Remove vertical gridlines (which appear horizontal when flipped)
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    
+    # Keep other aesthetics
+    panel.grid.minor.x = element_blank(),
     text = element_text(family = "LMRoman", color = "black", size = 24),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 24),
     legend.position = "bottom",
     legend.title = element_blank(),
     strip.text = element_text(face = "bold", size = 24),
-    axis.text.x = element_blank()
+    axis.text.y = element_blank()
   )
 ggsave(file.path(output_path, "Supervisor pct no area for improvement.pdf"), width = 11, height = 7.5)
 

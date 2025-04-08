@@ -4,13 +4,13 @@
 
 #General----
 #Load packages
-pacman::p_load(conflicted, here, tidyverse, sandwich, lmtest, modelsummary, tinytable, car, gtheory, fixest)
+pacman::p_load(conflicted, here, tidyverse, sandwich, lmtest, modelsummary, tinytable, car, gtheory, fixest, vtable)
 
 # Remove everything
 rm(list=ls())
 
 # Set output filepath - YOU'LL NEED TO UPDATE THIS 
-output_path <- "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
+output_path <- "C:/Users/yaj3ma/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
 
 # Conflict prefer
 conflict_prefer(name = "filter", winner = "dplyr")
@@ -86,10 +86,10 @@ model7 <- fit_clustered_model(areas_for_growth_ref ~ factor(observation_order), 
 model8 <- fit_clustered_model(next_steps_ref ~ factor(observation_order), analysis_data, "pst_id")
 
 # Extract the model objects for modelsummary
-models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
+models <- list(model1$model, model2$model, model3$model, model4$model)
 
 # Create a list of vcov matrices for modelsummary
-vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov)
 
 cm <- c("factor(observation_order)2" = "\\hspace{3mm} 2",
         "factor(observation_order)3" = "\\hspace{3mm} 3",
@@ -115,8 +115,8 @@ model7 <- fit_clustered_model(areas_for_growth_ref ~ factor(certification), anal
 model8 <- fit_clustered_model(next_steps_ref ~ factor(certification), analysis_data, "pst_id")
 
 # Extract models and vcov
-models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
-vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+models <- list(model1$model, model2$model, model3$model, model4$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov)
 
 cm <- c("factor(certification)4-8 English/SS" = "\\hspace{3mm} 4-8 English/SS",
         "factor(certification)4-8 Math/Sci" = "\\hspace{3mm} 4-8 Math/Sci",
@@ -142,8 +142,8 @@ model7 <- fit_clustered_model(areas_for_growth_ref ~ sup_blup_std + pst_blup_std
 model8 <- fit_clustered_model(next_steps_ref ~ sup_blup_std + pst_blup_std + sch_blup_std, analysis_data, "pst_id")
 
 # Extract models and vcov
-models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
-vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+models <- list(model1$model, model2$model, model3$model, model4$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov)
 
 cm <- c("pst_blup_std" = "\\hspace{3mm} PST",
         "sup_blup_std" = "\\hspace{3mm} Supervisor",
@@ -169,8 +169,8 @@ model7 <- fit_clustered_model(areas_for_growth_ref ~ st_advantage_index + suspen
 model8 <- fit_clustered_model(next_steps_ref ~ st_advantage_index + suspensions_instances + st_local, analysis_data, "pst_id")
 
 # Extract models and vcov
-models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
-vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+models <- list(model1$model, model2$model, model3$model, model4$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov)
 
 cm <- c("st_advantage_index" = "\\hspace{3mm} Standardized Advantage Index",
         "suspensions_instances" = "\\hspace{3mm} Standardized Suspensions",
@@ -196,12 +196,12 @@ model7 <- fit_clustered_model(areas_for_growth_ref ~ factor(sex) + factor(race) 
 model8 <- fit_clustered_model(next_steps_ref ~ factor(sex) + factor(race) + factor(sat_score_cat), analysis_data, "pst_id")
 
 # Extract models and vcov
-models <- list(model1$model, model2$model, model3$model, model4$model, model5$model, model6$model, model7$model, model8$model)
-vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov, model5$vcov, model6$vcov, model7$vcov, model8$vcov)
+models <- list(model1$model, model2$model, model3$model, model4$model)
+vcov_list <- list(model1$vcov, model2$vcov, model3$vcov, model4$vcov)
 
 outcome_means <- tibble::tribble(
-  ~term,           ~model1,                                             ~model2,                                           ~model3,                                          ~model4,                                        ~model5,                                             ~model6,                                           ~model7,                                          ~model8,
-  "Outcome Mean",  mean(analysis_data$strengths_mentioned_feed, na.rm = TRUE), mean(analysis_data$specific_examples_feed, na.rm = TRUE), mean(analysis_data$areas_for_growth_feed, na.rm = TRUE), mean(analysis_data$next_steps_feed, na.rm = TRUE), mean(analysis_data$strengths_mentioned_ref, na.rm = TRUE), mean(analysis_data$specific_examples_ref, na.rm = TRUE), mean(analysis_data$areas_for_growth_ref, na.rm = TRUE), mean(analysis_data$next_steps_ref, na.rm = TRUE)
+  ~term,           ~model1,                                             ~model2,                                           ~model3,                                          ~model4,                                      
+  "Outcome Mean",  mean(analysis_data$strengths_mentioned_feed, na.rm = TRUE), mean(analysis_data$specific_examples_feed, na.rm = TRUE), mean(analysis_data$areas_for_growth_feed, na.rm = TRUE), mean(analysis_data$next_steps_feed, na.rm = TRUE), 
 )
 
 cm <- c("factor(sex)Male" = "\\hspace{3mm} Male",
@@ -231,6 +231,16 @@ model1 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_managemen
 model2 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model3 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
 model4 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+
+# Create combined regression table
+models <- list(model1,model2,model3,model4)
+etable(models)
+
+# For an appendix table, put everything together 
+model5 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id")
+model6 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | pst_id + observation_order, data = analysis_data, cluster = "pst_id")
+models2 <- list(model5,model6)
+etable(models2)
 
 # Create combined regression table
 models <- list(model1,model2,model3,model4)
@@ -476,3 +486,17 @@ for (i in seq_along(split_tables)) {
   # Save the LaTeX table
   writeLines(table_chunk, file_name)
 }
+table(analysis_data$faminc)
+# Descriptive table----
+analysis_data %>%
+  mutate(race = factor(race, levels = c("Asian or Pacific Islander", "Black", "Hispanic", "Other", "White, Non-Hispanic", "Missing")),
+         sat_score_cat = factor(sat_score_cat, levels = c("<1000", "1000-1290", "1300-1600", "Missing")),
+         gpa_z_cat = factor(gpa_z_cat, levels = c("Less than -1 SD", "-1 to 1 SD", "More than 1 SD", "Missing")),
+         faminc = factor(faminc, levels = c("<$80k", "$80k-150k", ">$150k", ">$80k, 2009 only", "No response", "Unknown")),
+         father_colldeg = factor(mother_colldeg, levels = c("Yes", "No", "Missing")),
+         mother_colldeg = factor(father_colldeg, levels = c("Yes", "No", "Missing"))) %>%
+  sumtable(vars = c("sex", "race", "sat_score_cat", "gpa_z_cat", "mother_colldeg", "father_colldeg", "faminc", "certification"), 
+           labels = c("Sex", "Race", "SAT Score", "High School GPA (z-score)", "Mother Has College Degree", "Father Has College Degree", "Family Income", "Certification Area"),
+           out = "latex",
+           fit.page = '0.5\\textwidth',
+           file = paste0(output_path, "/Descriptive_Table.tex"))

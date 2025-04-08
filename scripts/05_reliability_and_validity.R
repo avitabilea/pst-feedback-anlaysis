@@ -229,21 +229,78 @@ openxlsx::write.xlsx(list("Feedback" = feedback_sample, "Reflection" = reflectio
                      overwrite = TRUE)
 
 # Upload
-manual_coding <- openxlsx::read.xlsx(here("validity", "validity_coding - KV.xlsx"), sheet = "Feedback", startRow = 2) %>%
+manual_coding_feed <- openxlsx::read.xlsx(here("validity", "validity_coding - KV.xlsx"), sheet = "Feedback", startRow = 2) %>%
   rename(observationid=X1) %>%
-  select(-X2) %>%
-  pivot_longer(cols = -observationid, values_to = "chatgpt_code") 
+  # select(-X2) %>%
+  pivot_longer(cols = -c(observationid, X2), values_to = "chatgpt_code") 
+
+manual_coding_ref <- openxlsx::read.xlsx(here("validity", "validity_coding - KV.xlsx"), sheet = "Reflection", startRow = 2) %>%
+  rename(observationid=X1) %>%
+  # select(-X2) %>%
+  pivot_longer(cols = -c(observationid, X2), values_to = "chatgpt_code") 
 
 feedback_sample_nonmissing <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) %>% 
   select(-c(area_for_improvement, text)) %>%
   pivot_longer(cols = -observationid, values_to = "manual_code") 
 
-validity_data <- feedback_sample_nonmissing %>%
-  inner_join(manual_coding, by = c("observationid", "name")) %>%
+reflection_sample_nonmissing <- read.csv(here("processed data", "2025.03.06 - Reflections Analysis.csv")) %>% 
+  select(-c(area_for_improvement, text)) %>%
+  pivot_longer(cols = -observationid, values_to = "manual_code") 
+
+validity_data_feed <- feedback_sample_nonmissing %>%
+  inner_join(manual_coding_feed, by = c("observationid", "name")) %>%
   mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"),
+         task = factor(task, levels = c("Quality Indicator", "Area for Improvement")),
+         name = case_when(name == "areas_for_growth" ~ "Area for Improvement",
+                          name == "next_steps" ~ "Next Steps",
+                          name == "specific_examples" ~ "Specific Examples",
+                          name == "strengths_mentioned" ~ "PST Strengths",
+                          name == "assessment_feedback_mentioned" ~ "Assessment \\& Feedback",
+                          name == "classroom_management_mentioned" ~ "Classroom Management",
+                          name == "communication_mentioned" ~ "Communication",
+                          name == "differentiation_mentioned" ~ "Differentiation",
+                          name == "lesson_planning_mentioned" ~ "Lesson Planning",
+                          name == "other_mentioned" ~ "Other",
+                          name == "student_comprehension_mentioned" ~ "Student Comprehension",
+                          name == "student_engagement_mentioned" ~ "Student Engagement"),
+         agree = ifelse(chatgpt_code==manual_code, 1, 0)) 
+
+validity_data_ref <- reflection_sample_nonmissing %>%
+  inner_join(manual_coding_ref, by = c("observationid", "name")) %>%
+  mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"),
+         task = factor(task, levels = c("Quality Indicator", "Area for Improvement")),
+         name = case_when(name == "areas_for_growth" ~ "Area for Improvement",
+                          name == "next_steps" ~ "Next Steps",
+                          name == "specific_examples" ~ "Specific Examples",
+                          name == "strengths_mentioned" ~ "PST Strengths",
+                          name == "assessment_feedback_mentioned" ~ "Assessment \\& Feedback",
+                          name == "classroom_management_mentioned" ~ "Classroom Management",
+                          name == "communication_mentioned" ~ "Communication",
+                          name == "differentiation_mentioned" ~ "Differentiation",
+                          name == "lesson_planning_mentioned" ~ "Lesson Planning",
+                          name == "other_mentioned" ~ "Other",
+                          name == "student_comprehension_mentioned" ~ "Student Comprehension",
+                          name == "student_engagement_mentioned" ~ "Student Engagement"),
          agree = ifelse(chatgpt_code==manual_code, 1, 0)) 
 
 # Check validity
-validity_data %>%
-  group_by(name) %>%
-  summarize(agreement_rate = mean(agree))
+validity_feed <- validity_data_feed %>%
+  group_by(task, name) %>%
+  summarize(agreement_rate = round(mean(agree)*100, 1)) %>%
+  arrange(task, -agreement_rate)
+
+validity_ref <- validity_data_ref %>%
+  group_by(task, name) %>%
+  summarize(agreement_rate = round(mean(agree)*100, 1)) %>%
+  arrange(task, -agreement_rate)
+
+validity_feed <- left_join(validity_feed, validity_ref, by = c("task", "name"))
+  
+table <- validity_feed %>%
+  tinytable::tt() %>%
+  save_tt("latex")
+
+table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE) 
+
+# Save to LaTeX
+writeLines(table, file.path(output_path, "Validity_Check_KV.tex"))
