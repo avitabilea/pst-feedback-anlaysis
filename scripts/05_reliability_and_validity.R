@@ -92,6 +92,24 @@ qual_coding_lim <- select(qual_coding, observationid, crm, Codes1,
 
 matched_data <- inner_join(analysis_data, qual_coding_lim) 
 
+# Example - humans fail to capture things!
+matched_data %>%
+  filter(classroom_management_mentioned_feed==1 & n_sentences_feed == 3) %>%
+  select(text_feedback, classroom_management_mentioned_feed, nocriticism, lessoncycle, lessonconnections, studentcomprehension, lessondelivery, praise, transitions, attention, nonverbaltechniques, corrections) %>%
+  filter(row_number()==2)
+
+# Example - mentions what is discussed during meeting in feedback
+matched_data %>%
+  filter(classroom_management_mentioned_feed==1 & n_sentences_feed == 3) %>%
+  select(text_feedback, classroom_management_mentioned_feed, nocriticism, lessoncycle, lessonconnections, studentcomprehension, lessondelivery, praise, transitions, attention, nonverbaltechniques, corrections) %>%
+  filter(row_number()==5)
+
+# Example - works well
+matched_data %>%
+  filter(classroom_management_mentioned_feed==1 & n_sentences_feed == 3) %>%
+  select(text_feedback, classroom_management_mentioned_feed, nocriticism, lessoncycle, lessonconnections, studentcomprehension, lessondelivery, praise, transitions, attention, nonverbaltechniques, corrections) %>%
+  filter(row_number()==6)
+
 #Regressions----
 model1 <- fit_clustered_model(classroom_management_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)
 model2 <- fit_clustered_model(lesson_planning_mentioned_feed ~ nocriticism + lessoncycle + lessonconnections + studentcomprehension + lessondelivery + praise + transitions + attention + nonverbaltechniques + corrections, data = matched_data)

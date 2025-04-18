@@ -17,7 +17,7 @@ font_add(family = "LMRoman", regular = here("lmroman10-regular.otf"))
 showtext_auto()
 
 # Set output filepath - YOU'LL NEED TO UPDATE THIS 
-output_path <- "C:/Users/yaj3ma/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
+output_path <- "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
 
 #Load data
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
@@ -100,7 +100,7 @@ plot_data_combined %>%
   labs(x = NULL, y = "% of Observations", fill = NULL) +
   theme_minimal(base_size = 14) +
   scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
-  scale_fill_manual(values = c("Supervisor Feedback" = "#FF8C42", "PST Reflections" = "#1F4E79")) +
+  scale_fill_manual(values = c("PST Reflections" = "#1F4E79", "Supervisor Feedback" = "#FF8C42"), guide = guide_legend(reverse = TRUE)) +
   theme(
     text = element_text(family = "LMRoman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
@@ -124,7 +124,7 @@ plot_data_combined %>%
   labs(x = NULL, y = "% of PSTs", fill = NULL) +
   theme_minimal(base_size = 14) +
   scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
-  scale_fill_manual(values = c("Supervisor Feedback" = "#FF8C42", "PST Reflections" = "#1F4E79")) +
+  scale_fill_manual(values = c("PST Reflections" = "#1F4E79", "Supervisor Feedback" = "#FF8C42"), guide = guide_legend(reverse = TRUE)) +
   theme(
     text = element_text(family = "LMRoman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
@@ -182,24 +182,30 @@ plot_data_combined <- bind_rows(
          Category = ifelse(Category=="Assessment Feedback", "Assessment and Feedback", Category),
          Category = factor(Category, levels = c("Other", "Differentiation", "Student Comprehension", "Assessment and Feedback", "Student Engagement", "Communication", "Lesson Planning", "Classroom Management", "No Area for Improvement")))
 
-# Create bar plot - feedback
+# Get the desired order based on PST Reflections' mean
+category_order <- plot_data_combined %>%
+  filter(Type == "Observation-Level", reflection == "PST Reflections") %>%
+  arrange(Mean) %>%
+  pull(Category)
+
+# Create bar plot
 plot_data_combined %>%
-  filter(Type == "Observation-Level") %>%
-  ggplot(aes(x = reorder(Category, Mean), y = Mean, fill = reflection)) +
+  filter(Type == "Observation-Level" & Category != "Other") %>%
+  mutate(Category = factor(Category, levels = category_order)) %>%
+  ggplot(aes(x = Category, y = Mean, fill = reflection)) +
   geom_col(position = "dodge", width = 0.7) +
   coord_flip() +
   labs(x = NULL, y = "% of Observations", fill = NULL) +
   theme_minimal(base_size = 14) +
-  scale_y_continuous(expand = c(0,0), limits = c(0, 0.75), labels = scales::percent_format()) +
-  scale_fill_manual(values = c("Supervisor Feedback" = "#FF8C42", "PST Reflections" = "#1F4E79")) +
-  theme(
-    text = element_text(family = "LMRoman", color = "black", size = 16),
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 0.75), labels = scales::percent_format()) +
+  scale_fill_manual(values = c("PST Reflections" = "#1F4E79", "Supervisor Feedback" = "#FF8C42"), guide = guide_legend(reverse = TRUE)) +
+  theme(text = element_text(family = "LMRoman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 16),
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
-    legend.position = "bottom"
-  )
+    legend.position = "bottom")
+
 ggsave(file.path(output_path, "Bar Chart Area for Improvement - Observation.pdf"), width = 7, height = 4)
 
 # What do PSTs mention when supervisors suggest other, nothing, or multiple areas for improvement?----
@@ -295,22 +301,31 @@ final_result %>%
   ))
 ggsave(file.path(output_path, "AFI_Ref_when_no_AFI_Feedback.pdf"), width = 11, height = 7.5)
 
-#Share of times supervisors provide no feedback----
+#Share of times supervisors provide feedback----
 # Prepare data and keep plotting order
 plot_data <- analysis_data %>%
+  mutate(afi_mentioned_feed = ifelse(no_afi_mentioned_feed==0, 1, 0)) %>%
   group_by(supervisor_id) %>%
   summarize(
-    no_area_for_improvement = sum(no_afi_mentioned_feed),
+    area_for_improvement = sum(afi_mentioned_feed),
     n = n()
   ) %>%
   ungroup() %>%
   mutate(
-    sup_share_no_area = no_area_for_improvement / n
+    sup_share_area = area_for_improvement / n,
+    # If supervisors never write feedback with an area for improvement, make this 0.001 so they show up in the graph
+    sup_share_area = ifelse(sup_share_area == 0, 0.0025, sup_share_area)
   ) %>%
-  arrange(desc(sup_share_no_area)) %>%
+  arrange(desc(sup_share_area)) %>%
   mutate(
     supervisor_id = factor(supervisor_id, levels = supervisor_id)
   )
+
+# For example, X\% of supervisors provide an area for improvement less than 25\% of the time and X\% never did.
+plot_data %>%
+  mutate(lt_25 = ifelse(sup_share_area < 0.25, 1, 0),
+         never = ifelse(sup_share_area == 0.0025, 1, 0)) %>%
+  summarize(across(c(lt_25, never), mean))
 
 # Bar count and quartile positions
 n_bars <- nrow(plot_data)
@@ -318,7 +333,7 @@ quartile_positions <- quantile(1:n_bars, probs = c(0.25, 0.5, 0.75), names = FAL
 quartile_labels <- c("75th percentile", "50th percentile", "25th percentile")
 
 # Plot
-ggplot(plot_data, aes(x = supervisor_id, y = sup_share_no_area)) +
+ggplot(plot_data, aes(x = supervisor_id, y = sup_share_area)) +
   geom_bar(stat = "identity", position = "dodge", fill = "#FF8C42", width = 0.5) +
   
   # Dashed lines at quartiles
@@ -332,7 +347,7 @@ ggplot(plot_data, aes(x = supervisor_id, y = sup_share_no_area)) +
   annotate(
     "text",
     x = quartile_positions+3,
-    y = 0.96,  # slightly moved up from 1.02
+    y = 0.875,  # slightly moved up from 1.02
     label = quartile_labels,
     angle = 0,  # horizontal text
     hjust = 0.5,  # center horizontally
@@ -343,13 +358,13 @@ ggplot(plot_data, aes(x = supervisor_id, y = sup_share_no_area)) +
   coord_flip() +
   theme_minimal() +
   labs(
-    y = "% of Feedback with No Area for Improvement",
+    y = "% of Supervisor's Feedback with an Area for Improvement",
     x = "Supervisor"
   ) +
   scale_y_continuous(
-    expand = c(0, 0.01),
+    expand = c(0, 0.04),
     breaks = c(0,0.25, 0.5, 0.75, 1),  # setting major breaks at .25, .5, .75, and 1
-    limits = c(0.0, 1.02),
+    limits = c(0.0, 1),
     labels = scales::percent_format()
   ) +
   theme(
@@ -371,15 +386,16 @@ ggsave(file.path(output_path, "Supervisor pct no area for improvement.pdf"), wid
 
 #How do outcomes look for the most and least strict supervisors----
 analysis_data %>%
+  mutate(afi_mentioned_feed = ifelse(no_afi_mentioned_feed==0, 1, 0)) %>%
   group_by(supervisor_id, sup_blup_std) %>%
   summarize(
-    no_area_for_improvement = sum(no_afi_mentioned_feed),
+    area_for_improvement = sum(afi_mentioned_feed),
     n_obs_sup = n(),
-    prop_no_area_for_improvement = no_area_for_improvement / n_obs_sup,
+    prop_area_for_improvement = area_for_improvement / n_obs_sup,
     .groups = "drop"  # This removes the grouping after summarizing
   ) %>%
   ungroup() %>%
-  ggplot(aes(x = sup_blup_std, y = prop_no_area_for_improvement)) +  # Removed size from here
+  ggplot(aes(x = sup_blup_std, y = prop_area_for_improvement)) +  # Removed size from here
   geom_point(aes(size = n_obs_sup)) +  # Added size here
   scale_size(range = c(0, 12)) +
   geom_smooth(
@@ -392,7 +408,7 @@ analysis_data %>%
   theme_minimal() +
   labs(
     x = "Supervisor BLUP (Standardized)",
-    y = "% of Obs. with No Area for Improvement",
+    y = "% of Obs. with an Area for Improvement",
     size = "Number of Observations"
   ) +
   scale_y_continuous(

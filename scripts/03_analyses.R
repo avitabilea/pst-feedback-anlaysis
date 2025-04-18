@@ -4,13 +4,13 @@
 
 #General----
 #Load packages
-pacman::p_load(conflicted, here, tidyverse, sandwich, lmtest, modelsummary, tinytable, car, gtheory, fixest, vtable)
+pacman::p_load(conflicted, here, tidyverse, sandwich, lmtest, modelsummary, tinytable, car, gtheory, fixest, vtable, marginaleffects, glue, broom)
 
 # Remove everything
 rm(list=ls())
 
 # Set output filepath - YOU'LL NEED TO UPDATE THIS 
-output_path <- "C:/Users/yaj3ma/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
+output_path <- "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
 
 # Conflict prefer
 conflict_prefer(name = "filter", winner = "dplyr")
@@ -227,27 +227,45 @@ table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRU
 writeLines(table, file.path(output_path, "Pred_feedback_5_demographics.tex"))
 
 #Predicting evaluation score----
-model1 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model2 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model3 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
-model4 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
+# Estimate models
+model1 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id")
+model2 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = analysis_data, cluster = "pst_id")
+model3 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id")
+model4 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | pst_id + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id")
 
-# Create combined regression table
-models <- list(model1,model2,model3,model4)
+models <- list(model1, model2, model3, model4)
 etable(models)
 
-# For an appendix table, put everything together 
-model5 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id")
-model6 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | pst_id + observation_order, data = analysis_data, cluster = "pst_id")
-models2 <- list(model5,model6)
-etable(models2)
+# Variables to compare against classroom_management_mentioned_feed
+vars <- c("no_afi_mentioned_feed","lesson_planning_mentioned_feed", "differentiation_mentioned_feed", "assessment_feedback_mentioned_feed", "student_engagement_mentioned_feed", "student_comprehension_mentioned_feed", "communication_mentioned_feed", "other_mentioned_feed" )
 
-# Create combined regression table
-models <- list(model1,model2,model3,model4)
-etable(models)
+# Create F-test hypotheses
+hypothesis_vec <- glue("classroom_management_mentioned_feed = {vars}")
 
+# Run F-tests for each model
+f_results <- map(models, ~hypotheses(.x, hypothesis = hypothesis_vec))
+
+# Determine which coefficients differ significantly from classroom_management_mentioned_feed
+get_dag_flags <- function(f_test_result) {
+  # Return a named logical vector indicating which variables should get a "†"
+  f_test_df <- as_tibble(f_test_result)
+  f_test_df |>
+    filter(p.value < 0.05) |>
+    pull(term) |>
+    str_extract("[^=\\s]+$") |>  # Extract right-hand side variable names
+    unique()
+}
+
+# Create a named list: each element contains vars to annotate for that model
+dag_vars <- map(f_results, get_dag_flags)
+
+# Store the dag_vars in a global environment for use in tidy_custom
+for (i in 1:length(models)) {
+  assign(paste0("dag_vars_", i), dag_vars[[i]])
+}
+
+# Create coefficient map for nice labels
 cm <- c(
-  "no_afi_mentioned_feed" = "\\hspace{3mm} No Area",
   "classroom_management_mentioned_feed" = "\\hspace{3mm} Classroom Management",
   "lesson_planning_mentioned_feed" = "\\hspace{3mm} Lesson Planning",
   "student_engagement_mentioned_feed" = "\\hspace{3mm} Student Engagement",
@@ -255,66 +273,44 @@ cm <- c(
   "assessment_feedback_mentioned_feed" = "\\hspace{3mm} Assessment and Feedback",
   "student_comprehension_mentioned_feed" = "\\hspace{3mm} Student Comprehension",
   "differentiation_mentioned_feed" = "\\hspace{3mm} Differentiation",
-  "other_mentioned_feed" = "\\hspace{3mm} Other Area"
+  "no_afi_mentioned_feed" = "\\hspace{3mm} None"
 )
 
-# Function to format F-test results
-format_ftest <- function(ftest_result) {
-  f_stat <- round(ftest_result$F[2], 1) # Extract and round F-statistic
-  p_value <- ftest_result$`Pr(>F)`[2]  # Extract p-value
-  
-  # Add stars for significance
-  stars <- ifelse(p_value <= 0.001, "***",
-                  ifelse(p_value <= 0.01, "**",
-                         ifelse(p_value <= 0.05, "*", "")))
-  
-  # Create dataframe with F-statistic and significance
-  data.frame(F = paste0(f_stat, stars))
-}
+# Make a tidy_custom function to put the dagger next to coeficients that are statistically different from Classroom Management at the 5-percent level
+# tidy_custom.fixest <- function(x) {
+#   # Get original tidy results
+#   out <- generics::tidy(x)
+#   
+#   # Get model index from object
+#   model_index <- as.numeric(gsub(".*_([0-9]+)$", "\\1", deparse(substitute(x))))
+#   
+#   # If model_index is NA, try to determine it from models list
+#   if (is.na(model_index)) {
+#     for (i in 1:length(models)) {
+#       if (identical(x, models[[i]])) {
+#         model_index <- i
+#         break
+#       }
+#     }
+#   }
+#   
+#   # Get relevant dag_vars
+#   dag_variables <- get(paste0("dag_vars_", model_index))
+#   
+#   # Add dag column
+#   out$dag <- ifelse(out$term %in% dag_variables, "$\\dag$", "")
+#   
+#   return(out)
+# }
 
-# Create hypothesis matrix for testing equality of classroom_management coefficient with all others
-run_equality_test <- function(model) {
-  # Get coefficient names for mentioned_feed variables
-  coef_names <- names(coef(model))
-  feed_vars <- coef_names[grepl("_mentioned_feed$", coef_names)]
-  feed_vars <- feed_vars[feed_vars != "no_afi_mentioned_feed"] # Exclude no_afi if desired
-  
-  cm_var <- "classroom_management_mentioned_feed"
-  other_vars <- feed_vars[feed_vars != cm_var]
-  
-  # Create hypothesis matrix for testing: classroom_management = other_var_1 = other_var_2 = ... = other_var_n
-  # This requires (n-1) constraints where n is the number of variables
-  hyp_matrix <- matrix(0, nrow = length(other_vars), ncol = length(coef_names))
-  colnames(hyp_matrix) <- coef_names
-  
-  # For each row, compare classroom_management to one other variable
-  for (i in seq_along(other_vars)) {
-    hyp_matrix[i, cm_var] <- 1
-    hyp_matrix[i, other_vars[i]] <- -1
-  }
-  
-  # Run the F-test
-  ftest_result <- linearHypothesis(model, hyp_matrix, test = "F")
-  return(ftest_result)
-}
-
-# Run F-tests for each model
-ftest1 <- run_equality_test(model1) %>% format_ftest()
-ftest2 <- run_equality_test(model2) %>% format_ftest()
-ftest3 <- run_equality_test(model3) %>% format_ftest()
-ftest4 <- run_equality_test(model4) %>% format_ftest()
-
-# Create the combined table row
-ftest <- bind_cols(tibble("F-stat$\\dag$"), ftest1, ftest2, ftest3, ftest4)
-attr(ftest, 'position') <- c(22)
-
-# Continue with table creation
-table <- modelsummary(models = models,
-                      add_rows = ftest,
-                      stars = c('*' = .05, '**' = .01, '***' = .001),
-                      coef_map = cm,
-                      gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
-                      gof_map = gm) %>%
+# Use modelsummary with the custom tidy function
+table <- modelsummary(
+  models = models,
+  coef_map = cm,
+  stars = c('*' = .05, '**' = .01, '***' = .001),
+  gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
+  gof_map = gm,
+  estimate = "{estimate}{stars}") %>%
   group_tt(i = list("\\textbf{Area for improvement}" = 1)) %>%
   save_tt("latex")
 
@@ -331,19 +327,12 @@ model3 <- feols(ever_enter_teaching ~ no_afi_mentioned_feed + classroom_manageme
 model4 <- feols(enter_teaching_imm ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model5 <- feols(same_school ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
 model6 <- feols(advantage_index ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
-model7 <- feols(examscore_std_ppr ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
-model8 <- feols(examscore_std_req ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
-model9 <- feols(ever_enter_teaching ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
-model10 <- feols(enter_teaching_imm ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
-model11 <- feols(same_school ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
-model12 <- feols(advantage_index ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = rename_with(select(analysis_data, -ends_with("_feed")), ~ sub("_ref$", "_feed", .), ends_with("_ref")), cluster = "pst_id", weights = ~inv_n_obs)
 
 # Create combined regression table
-models <- list(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10,model11,model12)
+models <- list(model1,model2,model3,model4,model5,model6)
 etable(models)
 
 cm <- c(
-  "no_afi_mentioned_feed" = "\\hspace{3mm} No Area",
   "classroom_management_mentioned_feed" = "\\hspace{3mm} Classroom Management",
   "lesson_planning_mentioned_feed" = "\\hspace{3mm} Lesson Planning",
   "student_engagement_mentioned_feed" = "\\hspace{3mm} Student Engagement",
@@ -351,7 +340,7 @@ cm <- c(
   "assessment_feedback_mentioned_feed" = "\\hspace{3mm} Assessment and Feedback",
   "student_comprehension_mentioned_feed" = "\\hspace{3mm} Student Comprehension",
   "differentiation_mentioned_feed" = "\\hspace{3mm} Differentiation",
-  "other_mentioned_feed" = "\\hspace{3mm} Other Area"
+  "no_afi_mentioned_feed" = "\\hspace{3mm} None"
 )
 
 table <- modelsummary(models = models,
@@ -486,17 +475,120 @@ for (i in seq_along(split_tables)) {
   # Save the LaTeX table
   writeLines(table_chunk, file_name)
 }
-table(analysis_data$faminc)
+
+
 # Descriptive table----
 analysis_data %>%
+  select(pst_id, sex, race, sat_score_cat, gpa_z_cat, faminc, father_colldeg, mother_colldeg, certification) %>%
+  distinct() %>%
   mutate(race = factor(race, levels = c("Asian or Pacific Islander", "Black", "Hispanic", "Other", "White, Non-Hispanic", "Missing")),
          sat_score_cat = factor(sat_score_cat, levels = c("<1000", "1000-1290", "1300-1600", "Missing")),
          gpa_z_cat = factor(gpa_z_cat, levels = c("Less than -1 SD", "-1 to 1 SD", "More than 1 SD", "Missing")),
          faminc = factor(faminc, levels = c("<$80k", "$80k-150k", ">$150k", ">$80k, 2009 only", "No response", "Unknown")),
-         father_colldeg = factor(mother_colldeg, levels = c("Yes", "No", "Missing")),
-         mother_colldeg = factor(father_colldeg, levels = c("Yes", "No", "Missing"))) %>%
+         father_colldeg = factor(father_colldeg, levels = c("Yes", "No", "Missing")),
+         mother_colldeg = factor(mother_colldeg, levels = c("Yes", "No", "Missing"))) %>%
   sumtable(vars = c("sex", "race", "sat_score_cat", "gpa_z_cat", "mother_colldeg", "father_colldeg", "faminc", "certification"), 
            labels = c("Sex", "Race", "SAT Score", "High School GPA (z-score)", "Mother Has College Degree", "Father Has College Degree", "Family Income", "Certification Area"),
            out = "latex",
-           fit.page = '0.5\\textwidth',
+           fit.page = '0.4\\textwidth',
+           anchor = "tab:descriptive_table",
+           # note = "Note: Table reports summary statistics for the analytic sample. The ``N'' column shows the total count for each variable and its subgroups, while the ``Percent'' column displays the corresponding percentages.",
            file = paste0(output_path, "/Descriptive_Table.tex"))
+
+#Appendix tables----
+# Outcomes Table
+model1 <- feols(examscore_std_ppr ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model2 <- feols(examscore_std_req ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model3 <- feols(ever_enter_teaching ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model4 <- feols(enter_teaching_imm ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed +no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model5 <- feols(same_school ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed +no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model6 <- feols(advantage_index ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model7 <- feols(examscore_std_ppr ~ no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model8 <- feols(examscore_std_req ~ no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model9 <- feols(ever_enter_teaching ~ no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model10 <- feols(enter_teaching_imm ~ no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model11 <- feols(same_school ~ no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + faminc + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+model12 <- feols(advantage_index ~ no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | sat_score_cat + gpa_z_cat + race + sex + mother_colldeg + father_colldeg + supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id", weights = ~inv_n_obs)
+
+# Create combined regression table
+models <- list(model1,model2,model3,model4,model5,model6,model7,model8,model9,model10,model11,model12)
+etable(models)
+
+cm <- c(
+  "classroom_management_mentioned_feed" = "\\hspace{3mm} Classroom Management",
+  "lesson_planning_mentioned_feed" = "\\hspace{3mm} Lesson Planning",
+  "student_engagement_mentioned_feed" = "\\hspace{3mm} Student Engagement",
+  "communication_mentioned_feed" = "\\hspace{3mm} Communication",
+  "assessment_feedback_mentioned_feed" = "\\hspace{3mm} Assessment and Feedback",
+  "student_comprehension_mentioned_feed" = "\\hspace{3mm} Student Comprehension",
+  "differentiation_mentioned_feed" = "\\hspace{3mm} Differentiation",
+  "no_afi_mentioned_feed" = "\\hspace{3mm} None",
+  # "other_mentioned_feed" = "\\hspace{3mm} Other Area",
+  "classroom_management_mentioned_ref" = "\\hspace{3mm}  Classroom Management",
+  "lesson_planning_mentioned_ref" = "\\hspace{3mm}  Lesson Planning",
+  "student_engagement_mentioned_ref" = "\\hspace{3mm}  Student Engagement",
+  "communication_mentioned_ref" = "\\hspace{3mm}  Communication",
+  "assessment_feedback_mentioned_ref" = "\\hspace{3mm}  Assessment and Feedback",
+  "student_comprehension_mentioned_ref" = "\\hspace{3mm}  Student Comprehension",
+  "differentiation_mentioned_ref" = "\\hspace{3mm}  Differentiation",
+  "no_afi_mentioned_ref" = "\\hspace{3mm}  None"
+  # "other_mentioned_ref" = "\\hspace{3mm}  Other Area"
+)
+
+table <- modelsummary(models = models,
+                      stars = c('*' = .05, '**' = .01, '***' = .001),
+                      coef_map = cm,
+                      gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
+                      gof_map = gm) %>%
+  group_tt(i = list("\\textbf{Supervisor Feedback}" = 1,
+                    "\\textbf{PST Reflections}" = 17)) %>%
+  save_tt("latex")
+
+table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE) %>% replace_x_with_checkmark()
+
+# Save to LaTeX
+writeLines(table, file.path(output_path, "Pred_Outcomes_Appendix.tex"))
+
+# Evaluation Score
+model1 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | supervisor_id + programcohort + observation_order, data = analysis_data, cluster = "pst_id")
+model2 <- feols(avg_eval_score_std ~ no_afi_mentioned_feed + classroom_management_mentioned_feed + lesson_planning_mentioned_feed + differentiation_mentioned_feed + assessment_feedback_mentioned_feed + student_engagement_mentioned_feed + student_comprehension_mentioned_feed + communication_mentioned_feed + other_mentioned_feed + no_afi_mentioned_ref + classroom_management_mentioned_ref + lesson_planning_mentioned_ref + differentiation_mentioned_ref + assessment_feedback_mentioned_ref + student_engagement_mentioned_ref + student_comprehension_mentioned_ref + communication_mentioned_ref + other_mentioned_ref | pst_id + observation_order, data = analysis_data, cluster = "pst_id")
+
+# Create combined regression table
+models <- list(model1,model2)
+etable(models)
+
+cm <- c(
+  "classroom_management_mentioned_feed" = "\\hspace{3mm} Classroom Management",
+  "lesson_planning_mentioned_feed" = "\\hspace{3mm} Lesson Planning",
+  "student_engagement_mentioned_feed" = "\\hspace{3mm} Student Engagement",
+  "communication_mentioned_feed" = "\\hspace{3mm} Communication",
+  "assessment_feedback_mentioned_feed" = "\\hspace{3mm} Assessment and Feedback",
+  "student_comprehension_mentioned_feed" = "\\hspace{3mm} Student Comprehension",
+  "differentiation_mentioned_feed" = "\\hspace{3mm} Differentiation",
+  "no_afi_mentioned_feed" = "\\hspace{3mm} None",
+  # "other_mentioned_feed" = "\\hspace{3mm} Other Area",
+  "classroom_management_mentioned_ref" = "\\hspace{3mm}  Classroom Management",
+  "lesson_planning_mentioned_ref" = "\\hspace{3mm}  Lesson Planning",
+  "student_engagement_mentioned_ref" = "\\hspace{3mm}  Student Engagement",
+  "communication_mentioned_ref" = "\\hspace{3mm}  Communication",
+  "assessment_feedback_mentioned_ref" = "\\hspace{3mm}  Assessment and Feedback",
+  "student_comprehension_mentioned_ref" = "\\hspace{3mm}  Student Comprehension",
+  "differentiation_mentioned_ref" = "\\hspace{3mm}  Differentiation",
+  "no_afi_mentioned_ref" = "\\hspace{3mm}  None"
+  # "other_mentioned_ref" = "\\hspace{3mm}  Other Area"
+)
+
+# Continue with table creation
+table <- modelsummary(models = models,
+                      stars = c('*' = .05, '**' = .01, '***' = .001),
+                      coef_map = cm,
+                      gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
+                      gof_map = gm) %>%
+  group_tt(i = list("\\textbf{Supervisor Feedback}" = 1,
+                    "\\textbf{PST Reflection}" = 17)) %>%
+  save_tt("latex")
+
+table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE) %>% replace_x_with_checkmark()
+
+# Save to LaTeX
+writeLines(table, file.path(output_path, "Pred_Eval_Score_Appendix.tex"))
