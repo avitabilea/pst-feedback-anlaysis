@@ -142,7 +142,12 @@ ggsave(file.path(output_path, "PST-Level Bar Chart.pdf"), width = 6, height = 4)
 #Plot area for improvement----
 plot_data <- analysis_data %>%
   mutate(feedback_score = rowMeans(across(c("no_afi_mentioned_feed", "classroom_management_mentioned_feed", "lesson_planning_mentioned_feed", "differentiation_mentioned_feed", "assessment_feedback_mentioned_feed", "student_engagement_mentioned_feed", "student_comprehension_mentioned_feed", "communication_mentioned_feed", "other_mentioned_feed")), na.rm = TRUE)) %>%
-  mutate(feedback_score = rowMeans(across(c("no_afi_mentioned_ref", "classroom_management_mentioned_ref", "lesson_planning_mentioned_ref", "differentiation_mentioned_ref", "assessment_feedback_mentioned_ref", "student_engagement_mentioned_ref", "student_comprehension_mentioned_ref", "communication_mentioned_ref", "other_mentioned_ref")), na.rm = TRUE))
+  mutate(feedback_score = rowMeans(across(c("no_afi_mentioned_ref", "classroom_management_mentioned_ref", "lesson_planning_mentioned_ref", "differentiation_mentioned_ref", "assessment_feedback_mentioned_ref", "student_engagement_mentioned_ref", "student_comprehension_mentioned_ref", "communication_mentioned_ref", "other_mentioned_ref")), na.rm = TRUE)) %>%
+  # Make things NA if there's no area for improvement
+  mutate(across(c("classroom_management_mentioned_feed", "lesson_planning_mentioned_feed", "differentiation_mentioned_feed", "assessment_feedback_mentioned_feed", "student_engagement_mentioned_feed", "student_comprehension_mentioned_feed", "communication_mentioned_feed", "other_mentioned_feed"),
+                ~ifelse(no_afi_mentioned_feed==1, NA, .x))) %>%
+  mutate(across(c("classroom_management_mentioned_ref", "lesson_planning_mentioned_ref", "differentiation_mentioned_ref", "assessment_feedback_mentioned_ref", "student_engagement_mentioned_ref", "student_comprehension_mentioned_ref", "communication_mentioned_ref", "other_mentioned_ref"),
+                ~ifelse(no_afi_mentioned_ref==1, NA, .x)))
 
 # Calculate overall means
 overall_means <- plot_data %>%
@@ -190,7 +195,7 @@ category_order <- plot_data_combined %>%
 
 # Create bar plot
 plot_data_combined %>%
-  filter(Type == "Observation-Level" & Category != "Other") %>%
+  filter(Type == "Observation-Level" & Category != "Other" & Category != "No Area for Improvement") %>%
   mutate(Category = factor(Category, levels = category_order)) %>%
   ggplot(aes(x = Category, y = Mean, fill = reflection)) +
   geom_col(position = "dodge", width = 0.7) +
