@@ -196,11 +196,12 @@ category_order <- plot_data_combined %>%
 # Create bar plot
 plot_data_combined %>%
   filter(Type == "Observation-Level" & Category != "Other" & Category != "No Area for Improvement") %>%
+  arrange(reflection, -Mean) %>%
   mutate(Category = factor(Category, levels = category_order)) %>%
   ggplot(aes(x = Category, y = Mean, fill = reflection)) +
   geom_col(position = "dodge", width = 0.7) +
   coord_flip() +
-  labs(x = NULL, y = "% of Observations", fill = NULL) +
+  labs(x = NULL, y = "% of Observations with an Area for Improvement", fill = NULL) +
   theme_minimal(base_size = 14) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 0.75), labels = scales::percent_format()) +
   scale_fill_manual(values = c("PST Reflections" = "#1F4E79", "Supervisor Feedback" = "#FF8C42"), guide = guide_legend(reverse = TRUE)) +
@@ -211,7 +212,7 @@ plot_data_combined %>%
     panel.grid.minor = element_blank(),
     legend.position = "bottom")
 
-ggsave(file.path(output_path, "Bar Chart Area for Improvement - Observation.pdf"), width = 7, height = 4)
+ggsave(file.path(output_path, "Bar Chart Area for Improvement - Observation.pdf"), width = 7.5, height = 4)
 
 # What do PSTs mention when supervisors suggest other, nothing, or multiple areas for improvement?----
 # Calculate share_same

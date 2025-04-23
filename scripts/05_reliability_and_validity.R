@@ -79,22 +79,6 @@ fit_clustered_model <- function(formula, data, cluster_var = NULL) {
 #Load data
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
 
-#Examples----
-# Example of "low-quality" feedback
-test <- filter(analysis_data, specific_examples_feed==0 & areas_for_growth_feed==0 & next_steps_feed==0) %>%
-  # select(text_feedback) %>%
-  filter(text_feedback=="'s instructional skills in the classroom are good .   Growth in confidence and pacing has been seen .")
-
-# Example of "high-quality" feedback
-filter(analysis_data, specific_examples_feed==1 & areas_for_growth_feed==1 & next_steps_feed==1) %>%
-  select(text_feedback) %>%
-  sample_n(1)
-
-# Example of "Classroom Management" feedback
-filter(analysis_data, classroom_management_mentioned_feed==1) %>%
-  select(text_feedback) %>%
-  sample_n(1)
-
 #Validity----
 library(haven)
 qual_coding <- read_dta("C:/Users/Andre/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/data/qual coding/Refl_CTO_response_analysis_07082024.dta") %>%
