@@ -4,7 +4,7 @@
 
 #General----
 #Load packages
-pacman::p_load(conflicted, here, tidyverse, showtext, scales)
+pacman::p_load(conflicted, here, tidyverse, showtext, scales, extrafont)
 
 # Remove everything
 rm(list=ls())
@@ -13,6 +13,7 @@ rm(list=ls())
 conflict_prefer(name = "filter", winner = "dplyr")
 
 #Add fonts
+font_add(family = "Times New Roman", regular = here("Times-New-Roman.otf"))
 font_add(family = "LMRoman", regular = here("lmroman10-regular.otf"))
 showtext_auto()
 
@@ -31,7 +32,7 @@ ggplot(analysis_data, aes(x=n_sentences_feed)) +
   ylab("Proportion") +
   scale_x_continuous(expand = c(0,0), limits = c(0,55)) +
   scale_y_continuous(expand = c(0,0)) +
-  theme(text=element_text(family="LMRoman", color = "black", size = 24), plot.caption = element_text(hjust = 0), axis.text = element_text(color = "black", size = 24)) +
+  theme(text=element_text(family = "Times New Roman", color = "black", size = 24), plot.caption = element_text(hjust = 0), axis.text = element_text(color = "black", size = 24)) +
   geom_vline(xintercept = median(analysis_data$n_sentences_feed), linetype = "dashed", color = "black")
 ggsave(file.path(output_path, "Sentences Per Feedback Hist.pdf"), width = 6, height = 4)
 
@@ -43,7 +44,7 @@ ggplot(analysis_data, aes(x=n_sentences_ref)) +
   ylab("Proportion") +
   scale_x_continuous(expand = c(0,0), limits = c(0,55)) +
   scale_y_continuous(expand = c(0,0)) +
-  theme(text=element_text(family="LMRoman", color = "black", size = 24), plot.caption = element_text(hjust = 0), axis.text = element_text(color = "black", size = 24)) +
+  theme(text=element_text(family = "Times New Roman", color = "black", size = 24), plot.caption = element_text(hjust = 0), axis.text = element_text(color = "black", size = 24)) +
   geom_vline(xintercept = median(analysis_data$n_sentences_ref, na.rm=T), linetype = "dashed", color = "black")
 ggsave(file.path(output_path, "Sentences Per Reflection Hist.pdf"), width = 6, height = 4)
 
@@ -102,7 +103,7 @@ plot_data_combined %>%
   scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
   scale_fill_manual(values = c("PST Reflections" = "#1F4E79", "Supervisor Feedback" = "#FF8C42"), guide = guide_legend(reverse = TRUE)) +
   theme(
-    text = element_text(family = "LMRoman", color = "black", size = 16),
+    text = element_text(family = "Times New Roman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 16),
     panel.grid.major.y = element_blank(),
@@ -113,6 +114,27 @@ plot_data_combined %>%
     limits = c("Actionable Steps", "Area for Improvement", "Specific Examples", "PST Strengths")
   )
 ggsave(file.path(output_path, "Observation-Level Bar Chart.pdf"), width = 6, height = 4)
+
+# Just Feedback
+plot_data_combined %>%
+  filter(Type == "Observation-Level", document == "Supervisor Feedback") %>%
+  ggplot(aes(x = reorder(Category, Mean), y = Mean)) +
+  geom_col(position = "dodge", width = 0.7, fill = "#9D2235") +
+  coord_flip() +
+  labs(x = NULL, y = "% of Observations", fill = NULL) +
+  theme_minimal(base_size = 24) +
+  scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
+  theme(
+    text = element_text(family = "Times New Roman", color = "black", size = 24),
+    plot.caption = element_text(hjust = 0),
+    axis.text = element_text(color = "black", size = 24),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
+  ) +
+  scale_x_discrete(
+    limits = c("Actionable Steps", "Area for Improvement", "Specific Examples", "PST Strengths")
+  )
 
 #PST-level descriptions----
 # Create bar plot
@@ -126,7 +148,7 @@ plot_data_combined %>%
   scale_y_continuous(expand = c(0,0), limits = c(0, 1.05), labels = scales::percent_format()) +
   scale_fill_manual(values = c("PST Reflections" = "#1F4E79", "Supervisor Feedback" = "#FF8C42"), guide = guide_legend(reverse = TRUE)) +
   theme(
-    text = element_text(family = "LMRoman", color = "black", size = 16),
+    text = element_text(family = "Times New Roman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 16),
     panel.grid.major.y = element_blank(),
@@ -205,7 +227,7 @@ plot_data_combined %>%
   theme_minimal(base_size = 14) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 0.75), labels = scales::percent_format()) +
   scale_fill_manual(values = c("PST Reflections" = "#1F4E79", "Supervisor Feedback" = "#FF8C42"), guide = guide_legend(reverse = TRUE)) +
-  theme(text = element_text(family = "LMRoman", color = "black", size = 16),
+  theme(text = element_text(family = "Times New Roman", color = "black", size = 16),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 16),
     panel.grid.major.y = element_blank(),
@@ -213,6 +235,30 @@ plot_data_combined %>%
     legend.position = "bottom")
 
 ggsave(file.path(output_path, "Bar Chart Area for Improvement - Observation.pdf"), width = 7.5, height = 4)
+
+plot_data_combined %>%
+  filter(Type == "Observation-Level", Category != "Other", Category != "No Area for Improvement", reflection == "Supervisor Feedback" ) %>%
+  # Order Category by Mean descending
+  mutate(Category = fct_reorder(Category, Mean)) %>%
+  ggplot(aes(x = Category, y = Mean)) +
+  geom_col(width = 0.7, fill = "#9D2235") +
+  coord_flip() +
+  labs(
+    x = NULL,
+    y = "% of Observations with an Area for Improvement"
+  ) +
+  scale_y_continuous(
+    expand = c(0, 0),
+    limits = c(0, 0.6),
+    labels = scales::percent_format()
+  ) +
+  theme_minimal(base_size = 24) +
+  theme(
+    text = element_text(family = "Times New Roman", color = "black", size = 24),
+    axis.text = element_text(color = "black", size = 24),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 
 # What do PSTs mention when supervisors suggest other, nothing, or multiple areas for improvement?----
 # Calculate share_same
@@ -293,7 +339,7 @@ final_result %>%
     labels = percent_format()
   ) +
   theme(
-    text = element_text(family = "LMRoman", color = "black", size = 24),
+    text = element_text(family = "Times New Roman", color = "black", size = 24),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 24),
     legend.position = "bottom",
@@ -358,7 +404,7 @@ ggplot(plot_data, aes(x = supervisor_id, y = sup_share_area)) +
     angle = 0,  # horizontal text
     hjust = 0.5,  # center horizontally
     size = 6,
-    family = "LMRoman"
+    family = "Times New Roman"
   ) +
   
   coord_flip() +
@@ -380,7 +426,7 @@ ggplot(plot_data, aes(x = supervisor_id, y = sup_share_area)) +
     
     # Keep other aesthetics
     panel.grid.minor.x = element_blank(),
-    text = element_text(family = "LMRoman", color = "black", size = 24),
+    text = element_text(family = "Times New Roman", color = "black", size = 24),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 24),
     legend.position = "bottom",
@@ -424,7 +470,7 @@ analysis_data %>%
     labels = scales::percent_format()
   ) +
   theme(
-    text = element_text(family = "LMRoman", color = "black", size = 24),
+    text = element_text(family = "Times New Roman", color = "black", size = 24),
     plot.caption = element_text(hjust = 0),
     axis.text = element_text(color = "black", size = 24),
     legend.position = "bottom",
@@ -432,3 +478,23 @@ analysis_data %>%
     strip.text = element_text(face = "bold", size = 24)
   )
 ggsave(file.path(output_path, "Supervisor BLUPS vs AFI.pdf"), width = 11, height = 7.5)
+
+#Density plot of average eval score----
+# Calculate mean and standard deviation
+mean_val <- mean(analysis_data$avg_eval_score_std, na.rm = TRUE)
+sd_val <- sd(analysis_data$avg_eval_score_std, na.rm = TRUE)
+
+# Create density plot with custom x-axis ticks
+ggplot(analysis_data, aes(x = avg_eval_score_std)) +
+  geom_density(fill = "lightblue", alpha = 0.6) +
+  geom_vline(xintercept = mean_val, color = "#FF8C42", linetype = "dashed", linewidth = 1) +
+  geom_vline(xintercept = mean_val + sd_val, color = "#1F4E79", linetype = "dotted", linewidth = 1) +
+  geom_vline(xintercept = mean_val - sd_val, color = "#1F4E79", linetype = "dotted", linewidth = 1) +
+  scale_x_continuous(breaks = -3:3) +
+  labs(
+    x = "Standardized Evaluation Score",
+    y = "Density"
+  ) +
+  theme_minimal() +
+  theme(text=element_text(family = "Times New Roman", color = "black", size = 24), plot.caption = element_text(hjust = 0), axis.text = element_text(color = "black", size = 24), panel.grid.minor = element_blank())
+ggsave(file.path(output_path, "Density Plot of Avg Eval Score.pdf"), width = 11, height = 7.5)

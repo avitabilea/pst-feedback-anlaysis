@@ -5,6 +5,7 @@ bi_and_muti_variate_feols <- function(
     data,                  # Data frame
     fixed_effects = NULL,  # Vector of fixed effects
     cluster_var = NULL,    # Variable to cluster on
+    weights = NULL,        # Optional weights variable for weighted regression
     stars = c('*' = .1, '**' = .05, '***' = .01)  # Significance levels
 ) {
   require(fixest)
@@ -22,9 +23,13 @@ bi_and_muti_variate_feols <- function(
   for (i in seq_along(independent_vars)) {
     formula_text <- paste0(dependent_var, " ~ ", independent_vars[i], fe_part)
     
-    # Run the model
-    if (!is.null(cluster_var)) {
+    # Run the model with appropriate parameters
+    if (!is.null(cluster_var) && !is.null(weights)) {
+      bivariate_models[[i]] <- feols(as.formula(formula_text), data = data, cluster = cluster_var, weights = weights)
+    } else if (!is.null(cluster_var)) {
       bivariate_models[[i]] <- feols(as.formula(formula_text), data = data, cluster = cluster_var)
+    } else if (!is.null(weights)) {
+      bivariate_models[[i]] <- feols(as.formula(formula_text), data = data, weights = weights)
     } else {
       bivariate_models[[i]] <- feols(as.formula(formula_text), data = data)
     }
@@ -33,9 +38,13 @@ bi_and_muti_variate_feols <- function(
   # Create multivariate model (all independent variables together)
   formula_text <- paste0(dependent_var, " ~ ", paste(independent_vars, collapse = " + "), fe_part)
   
-  # Run the model
-  if (!is.null(cluster_var)) {
+  # Run the model with appropriate parameters
+  if (!is.null(cluster_var) && !is.null(weights)) {
+    multivariate_model <- feols(as.formula(formula_text), data = data, cluster = cluster_var, weights = weights)
+  } else if (!is.null(cluster_var)) {
     multivariate_model <- feols(as.formula(formula_text), data = data, cluster = cluster_var)
+  } else if (!is.null(weights)) {
+    multivariate_model <- feols(as.formula(formula_text), data = data, weights = weights)
   } else {
     multivariate_model <- feols(as.formula(formula_text), data = data)
   }
@@ -63,7 +72,7 @@ bi_and_muti_variate_feols <- function(
     select(part, term, statistic, value)
   
   table <- left_join(univariate_table, multivariate_table) %>%
-    rename(univariate_results = value, multivariate_results = `(1)`)
+    rename(univariate_results = value, multivariate_results = (1))
   
   return(list(table = table, univariate_table = univariate_table, multivariate_table = multivariate_table))
 }

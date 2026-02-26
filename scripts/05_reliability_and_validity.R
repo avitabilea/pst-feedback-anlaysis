@@ -4,13 +4,13 @@
 
 #General----
 #Load packages
-pacman::p_load(conflicted, here, tidyverse, fixest, modelsummary, tinytable, car, gtheory)
+pacman::p_load(conflicted, here, tidyverse, fixest, modelsummary, tinytable, car, gtheory, psych)
 
 # Remove everything
 rm(list=ls())
 
 # Set output filepath - YOU'LL NEED TO UPDATE THIS 
-output_path <- "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
+output_path <- "C:/Users/yaj3ma/Dropbox/Apps/Overleaf/PST Feedback Text Analysis/figures_and_tables"
 
 # Conflict prefer
 conflict_prefer(name = "filter", winner = "dplyr")
@@ -80,8 +80,7 @@ fit_clustered_model <- function(formula, data, cluster_var = NULL) {
 analysis_data <- readRDS(here("processed data", "analysis_data.RDS"))
 
 #Validity----
-library(haven)
-qual_coding <- read_dta("C:/Users/Andre/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/data/qual coding/Refl_CTO_response_analysis_07082024.dta") %>%
+qual_coding <- haven::read_dta("C:/Users/Andre/Dropbox/Andrew and Brendan Shared Folder/PST Feedback Text/data/qual coding/Refl_CTO_response_analysis_07082024.dta") %>%
   filter(!(nocriticism == 1 & (lessoncycle == 1 | lessonconnections == 1 | studentcomprehension == 1 | lessondelivery == 1 | praise == 1 | transitions == 1 | attention == 1 | nonverbaltechniques == 1 | corrections == 1)))
 
 #Combine data sources----
@@ -149,7 +148,7 @@ table <- modelsummary(models = models,
                       exponentiate = T,
                       gof_omit = 'DF|Deviance|AIC|BIC|RMSE|Std.Errors',
                       gof_map = gm) %>%
-  group_tt(i = list("\\textbf{Monitoring Student Behavior}" = 1, "\\textbf{Instructional Development}" = 10)) %>%
+  group_tt(i = list("\\textbf{Monitoring Student Behavior}" = 1, "\\textbf{Instructional Development}" = 11)) %>%
   save_tt("latex")
 
 table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE)
@@ -186,7 +185,7 @@ writeLines(table, "C:/Users/Andre/Dropbox/Apps/Overleaf/PST Feedback Text Analys
 
 #Reliability----
 # Feedback
-feedback_1 <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) 
+feedback_1 <- read.csv(here("processed data", "2025.04.29 - Feedback Analysis.csv")) 
 feedback_2 <- read.csv(here("processed data", "2025.03.07 - Feedback Analysis.csv")) 
 
 feedback_1 <- feedback_1 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_1=value)
@@ -198,10 +197,11 @@ merged_data_feed <- left_join(feedback_1, feedback_2, by = c("observationid", "n
 
 agreement_feed <- merged_data_feed %>%
   group_by(task, name) %>%
-  summarize(agreement_rate = mean(agreement)*100)
+  summarize(agreement_rate = mean(agreement, na.rm=T)*100, .groups = "drop") %>%
+  select(-task)
 
 # Feedback
-reflection_1 <- read.csv(here("processed data", "2025.03.06 - Reflections Analysis.csv")) 
+reflection_1 <- read.csv(here("processed data", "2025.04.30 - Reflections Analysis.csv")) 
 reflection_2 <- read.csv(here("processed data", "2025.03.09 - Reflections Analysis.csv")) 
 
 reflection_1 <- reflection_1 %>% select(-c(text, area_for_improvement)) %>% pivot_longer(cols = -observationid) %>% rename(value_1=value)
@@ -213,15 +213,29 @@ merged_data_ref <- left_join(reflection_1, reflection_2, by = c("observationid",
 
 agreement_ref <- merged_data_ref %>%
   group_by(task, name) %>%
-  summarize(agreement_rate = mean(agreement)*100) %>%
-  select(-task)
+  summarize(agreement_rate = mean(agreement, na.rm=T)*100, .groups = "drop")
 
-table <- bind_cols(agreement_feed, agreement_ref) %>%
-  # mutate(name = "Agreement rate (\\%)") %>%
+table <- left_join(agreement_feed, agreement_ref, by = "name") %>%
+  relocate(task, name) %>%
   mutate(across(where(is.numeric), ~round(.x, 1))) %>%
-  # relocate(name, task) %>%
+  mutate(task = ifelse(name %in% c("specific_examples", "next_steps", "strengths_mentioned", "areas_for_growth"), "Quality Indicator", "Area for Improvement"),
+         task = factor(task, levels = c("Quality Indicator", "Area for Improvement")),
+         name = case_when(name == "areas_for_growth" ~ "Area for Improvement",
+                          name == "next_steps" ~ "Next Steps",
+                          name == "specific_examples" ~ "Specific Examples",
+                          name == "strengths_mentioned" ~ "PST Strengths",
+                          name == "assessment_feedback_mentioned" ~ "Assessment \\& Feedback",
+                          name == "classroom_management_mentioned" ~ "Classroom Management",
+                          name == "communication_mentioned" ~ "Communication",
+                          name == "differentiation_mentioned" ~ "Differentiation",
+                          name == "lesson_planning_mentioned" ~ "Lesson Planning",
+                          name == "other_mentioned" ~ "Other",
+                          name == "student_comprehension_mentioned" ~ "Student Comprehension",
+                          name == "student_engagement_mentioned" ~ "Student Engagement")) %>%
+  arrange(task, -agreement_rate.x) %>%
   tt() %>%
-  save_tt(output="latex")
+  # group_tt(i = left_join(agreement_feed, agreement_ref, by = "name")$task) %>%
+  save_tt(output = "latex")
 
 table <- sub("(?s).*?\\\\midrule(.*?)\\\\bottomrule.*", "\\1", table, perl = TRUE)
 
@@ -257,7 +271,7 @@ manual_coding_ref <- openxlsx::read.xlsx(here("validity", "validity_coding - KV.
   # select(-X2) %>%
   pivot_longer(cols = -c(observationid, X2), values_to = "chatgpt_code") 
 
-feedback_sample_nonmissing <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) %>% 
+feedback_sample_nonmissing <- read.csv(here("processed data", "2025.04.29 - Feedback Analysis.csv")) %>% 
   select(-c(area_for_improvement, text)) %>%
   pivot_longer(cols = -observationid, values_to = "manual_code") 
 
@@ -313,8 +327,50 @@ validity_ref <- validity_data_ref %>%
   arrange(task, -agreement_rate)
 
 validity_feed <- left_join(validity_feed, validity_ref, by = c("task", "name"))
+
+# Function to calculate Cohen's Kappa for each name/task
+calc_kappa <- function(data) {
+  data %>%
+    group_by(name, task) %>%
+    summarize(kappa = cohen.kappa(cbind(chatgpt_code, manual_code))$kappa, .groups = "drop")
+}
+
+# Compute kappa values - leaving this out because the prevalence is so high (i.e., )
+kappa_feed <- calc_kappa(validity_data_feed) %>% filter(task == "Quality Indicator")
+kappa_ref <- calc_kappa(validity_data_ref) %>% filter(task == "Quality Indicator")
   
-table <- validity_feed %>%
+# Function to calculate summary stats for each feature
+calc_agreement_stats <- function(data) {
+  data %>%
+    group_by(task, name) %>%
+    summarize(
+      n = n(),
+      prevalence_manual = round(mean(manual_code == 1) * 100, 1),
+      prevalence_gpt = round(mean(chatgpt_code == 1) * 100, 1),
+      agreement_rate = round(mean(chatgpt_code == manual_code) * 100, 1),
+      kappa = round(cohen.kappa(cbind(chatgpt_code, manual_code))$kappa, 3),
+      .groups = "drop"
+    )
+}
+
+# Apply to each dataset
+validity_feed <- calc_agreement_stats(validity_data_feed) %>%
+  rename_with(~ paste0(.x, "_feed"), c("prevalence_manual", "prevalence_gpt", "agreement_rate", "kappa"))
+
+validity_ref <- calc_agreement_stats(validity_data_ref) %>%
+  rename_with(~ paste0(.x, "_ref"), c("prevalence_manual", "prevalence_gpt", "agreement_rate", "kappa"))
+
+# Merge reflection and feedback summaries
+validity_summary <- left_join(validity_feed, validity_ref, by = c("task", "name"))
+
+# Optional: order for display
+validity_summary <- validity_summary %>%
+  arrange(task, desc(agreement_rate_feed)) %>%
+  # filter(task == "Quality Indicator") %>%
+  select(-n.x, -n.y, -contains("kappa"))
+
+# Output as LaTeX table
+table <- validity_summary %>%
   tinytable::tt() %>%
   save_tt("latex")
 

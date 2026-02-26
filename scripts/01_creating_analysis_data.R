@@ -14,10 +14,10 @@ conflict_prefer(name = "filter", winner = "dplyr")
 
 #Import data----
 # Publicly-available observation-level file
-pst_data <- read.xlsx(here("raw data", "PST Data.xlsx")) %>% mutate(suspensions_instances = as.numeric(suspensions_instances))
+pst_data <- read.xlsx(here("raw data", "PST Data.xlsx"))
 
 # LLM-analyzed data
-llm_coded_feedback <- read.csv(here("processed data", "2025.03.05 - Feedback Analysis.csv")) %>% 
+llm_coded_feedback <- read.csv(here("processed data", "2025.04.29 - Feedback Analysis.csv")) %>% 
   rename_with(~ if_else(.x == "observationid", .x, paste0(.x, "_feed"))) %>%
   select(-text_feed) %>%
   # Despite begging, need to reclassify some of the area_for_improvement categorizations (applies to very few)
@@ -28,7 +28,7 @@ llm_coded_feedback <- read.csv(here("processed data", "2025.03.05 - Feedback Ana
                                                area_for_improvement_feed %in% c("Curriculum Familiarity", "Content Knowledge") ~ "other",
                                                TRUE ~ area_for_improvement_feed))
 
-llm_coded_reflections <- read.csv(here("processed data", "2025.03.06 - Reflections Analysis.csv")) %>% 
+llm_coded_reflections <- read.csv(here("processed data", "2025.04.30 - Reflections Analysis.csv")) %>% 
   rename_with(~ if_else(.x == "observationid", .x, paste0(.x, "_ref"))) %>%
   select(-text_ref) %>%
   # Despite begging, need to reclassify some of the area_for_improvement categorizations (applies to very few)
@@ -39,7 +39,6 @@ llm_coded_reflections <- read.csv(here("processed data", "2025.03.06 - Reflectio
                                                TRUE ~ area_for_improvement_ref))
 
 #Preparing data----
-table(pst_data$race)
 analysis_data <- pst_data %>%
   # Merge in LLM-analyzed data
   left_join(llm_coded_feedback, by = "observationid") %>%
@@ -53,11 +52,15 @@ analysis_data <- pst_data %>%
     race = case_when(race == "Black" ~ "Black",
                      race == "Hispanic" ~ "Hispanic",
                      race == "White, Non-Hispanic" ~ "White, Non-Hispanic",
-                     race == "Asian or Pacific Islander" ~ "Asian or Pacific Islander",
+                     race == "Asian" ~ "Asian",
                      race == "Missing" ~ "Missing",
                      TRUE ~ "Other"),
     
+    # Create missing category for suspension quartile
+    st_suspension_quartile = ifelse(is.na(st_suspension_quartile), -99, st_suspension_quartile),
+    
     # Turn categorical variables into factors
+    st_suspension_quartile = relevel(factor(st_suspension_quartile, levels = c("1", "2", "3", "4", "-99"), labels = c("1", "2", "3", "4", "Missing")), ref = "1"),
     certification = relevel(factor(certification), ref = "EC-6"),
     sat_score_cat = relevel(factor(sat_score_cat), ref = "1000-1290"),
     race = relevel(factor(race), ref = "White, Non-Hispanic"),
@@ -65,6 +68,11 @@ analysis_data <- pst_data %>%
     sex = relevel(factor(sex), ref = "Female"),
     mother_colldeg = relevel(factor(mother_colldeg), ref = "Yes"),
     father_colldeg = relevel(factor(father_colldeg), ref = "Yes"),
+    degreegpr_quartile_new = case_when(degreegpr_quartile == 1 ~ 1,
+                                       degreegpr_quartile %in% c(2,3) ~ 2,
+                                       degreegpr_quartile == 4 ~ 3,
+                                       is.na(degreegpr_quartile) ~ 4),
+    degreegpr_quartile_new = relevel(factor(degreegpr_quartile_new), ref = "2"),
     
     # Clean area for improvement variables 
     area_for_improvement_feed = factor(area_for_improvement_feed, 
@@ -125,7 +133,6 @@ analysis_data <- pst_data %>%
                      student_comprehension_mentioned_ref, communication_mentioned_ref, 
                      other_mentioned_ref)) == 0, 1, 0))
   
-
 # Estimate models predicting average evaluation score with random intercepts for supervisor, PST, and clinical teaching school
 model <- lmer(avg_eval_score_std ~ factor(observation_order) + (1 | supervisor_id) + (1 | pst_id) + (1 | st_school_id), data = analysis_data)
 
@@ -153,3 +160,12 @@ analysis_data <- analysis_data %>%
 
 #Save analysis data----
 saveRDS(analysis_data, here("processed data", "analysis_data.RDS"))
+haven::write_dta(rename(analysis_data, 
+                        class_management_mentioned_feed = classroom_management_mentioned_feed, 
+                        assess_feedback_mentioned_feed = assessment_feedback_mentioned_feed, 
+                        student_engage_mentioned_feed = student_engagement_mentioned_feed, 
+                        student_comp_mentioned_feed = student_comprehension_mentioned_feed, 
+                        class_management_mentioned_ref = classroom_management_mentioned_ref, 
+                        assess_feedback_mentioned_ref=assessment_feedback_mentioned_ref, 
+                        student_comp_mentioned_ref=student_comprehension_mentioned_ref), 
+                 here("processed data", "analysis_data.dta"))
