@@ -12,10 +12,6 @@ The raw data are publicly available on OpenICPSR:
 
 Download `PST Data.xlsx` and place it in the `raw data/` directory of this repository.
 
-The reliability and validity checks in Step 6 also require two additional files that are not publicly available. Researchers who wish to replicate those checks should contact the authors to request access:
-- `qual coding/Refl_CTO_response_analysis_07082024.dta` — qualitative coding data used for external validity
-- `validity/validity_coding - KV.xlsx` — manually coded subsample used for human-LLM agreement checks
-
 ---
 
 ## Software Requirements
