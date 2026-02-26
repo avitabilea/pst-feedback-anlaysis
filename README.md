@@ -121,7 +121,11 @@ Produces the reliability and validity tables reported in the Online-Only Technic
 - **Table B4:** Human-LLM agreement rates based on a manually coded random sample of 100 documents
 - **Table B5:** Regressions predicting LLM-coded areas for improvement using independent qualitative coding
 
-**Note:** Tables B4 and B5 require the human-coded validity files listed in the Data section above, which are not publicly available. Please contact the authors to request access to these files.
+**Note:** Tables B4 and B5 require two additional files that are not publicly available:
+- `qual coding/Refl_CTO_response_analysis_07082024.dta` — qualitative coding data used for external validity
+- `validity/validity_coding - KV.xlsx` — manually coded subsample used for human-LLM agreement checks
+
+Please contact the authors to request access to these files.
 
 ---
 
